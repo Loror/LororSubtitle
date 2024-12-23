@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="LrcView">
+        <attr name="lrcTextColor" format="color" />
+        <attr name="lrcHighlightTextColor" format="color" />
+        <attr name="lrcHighlightBold" format="boolean" />
+        <attr name="lrcTextSize" format="dimension" />
+        <attr name="lrcLineSpace" format="dimension" />
+        <attr name="lrcShadow" format="dimension" />
+        <attr name="lrcMaxLine" format="integer" />
+        <attr name="lrcGravity" format="enum">
+            <enum name="left" value="0" />
+            <enum name="center" value="1" />
+            <enum name="right" value="2" />
+        </attr>
+    </declare-styleable>
+</resources>

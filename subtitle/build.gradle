@@ -1,0 +1,51 @@
+apply plugin: 'com.android.library'
+apply plugin: 'maven-publish'
+
+android {
+
+    namespace "com.loror.subtitle"
+    compileSdkVersion 33
+
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+
+dependencies {
+    compileOnly 'androidx.annotation:annotation:1.2.0'
+    implementation 'com.alibaba:fastjson:1.2.73'
+}
+
+publishing {
+    publications {
+        plugin(MavenPublication) {
+            groupId = 'com.loror'
+            artifactId = 'LororSubtitle'
+            version = '1.0.0'
+            afterEvaluate { artifact(tasks.getByName("bundleReleaseAar")) }
+        }
+    }
+    repositories {
+        maven {
+            name = 'repo'
+            url = layout.buildDirectory.dir("repo")
+        }
+    }
+}
