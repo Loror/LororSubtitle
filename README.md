@@ -33,7 +33,7 @@ allprojects {
 ## 显示示例
 
 ```
- private val list = mutableListOf<SubtitlesModel>()
+    private val list = mutableListOf<SubtitlesModel>()
     private var cRender: SubtitlesRender? = null
     private var time = 0
     private val handler = Handler(Looper.getMainLooper())
@@ -57,6 +57,10 @@ allprojects {
     }
     
     private fun initView() {
+        //设置视频比例，以实际视频大小为准
+        binding.subtitle.render.setAspectRatio(1920f / 1080)
+        //设置字幕显示到视频范围
+        binding.subtitle.render.setLocateInVideo(true)
         runBlocking {
             getSubtitle()
                 .catch {
