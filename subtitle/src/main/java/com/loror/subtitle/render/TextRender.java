@@ -40,8 +40,9 @@ public class TextRender {
     private int bottomSpace;//底部字幕避让位置
     private float aspectRatio = 16f / 9;//视频宽高比
     private boolean aspectRatioSet;//视频宽高比是否设置
-    private boolean locateInVideo;//字幕显示到视频范围（影响上下字幕）
+    private boolean locateInVideo = true;//字幕显示到视频范围（影响上下字幕）
     private boolean notRenderBeforeAspectRatioSet;//视频比例设置前不渲染
+    private float srtBottomSpace = 60;//设置入幕srt底部距离
     private int width, height;//绘制宽高
 
     public TextRender(int lineSpace) {
@@ -92,8 +93,14 @@ public class TextRender {
         Rect r = canvas.getClipBounds();
         this.width = r.width();
         this.height = r.height();
-        styledPaint.setScreenSize(width, height);
-        vectorPaint.setScreenSize(width, height);
+        if (locateInVideo && aspectRatioSet) {
+            Rect area = getDrawArea(null);
+            styledPaint.setScreenSize(area.width(), area.height());
+            vectorPaint.setScreenSize(area.width(), area.height());
+        } else {
+            styledPaint.setScreenSize(width, height);
+            vectorPaint.setScreenSize(width, height);
+        }
         drawText(canvas);
     }
 
@@ -197,7 +204,10 @@ public class TextRender {
                     }
                     //注意：extra是复用对象，多线程执行render可能将其渲染回1
                     //字高根据实际视频高度计算，当前视频使用定高宽，绘制字体偏大，缩小避免绘制超出clip区域
-                    extra.currentFontScale = extra.currentFontScale * Math.min(1f, (width * 1f / height) / aspectRatio);
+                    //竖屏全屏宽高改变，计算异常
+                    if (!locateInVideo) {
+                        extra.currentFontScale = extra.currentFontScale * Math.min(1f, (width * 1f / height) / aspectRatio);
+                    }
                 }
                 styledPaint.setMode(StyledPaint.MODE_BODY);
                 styledPaint.setPaint(extra);
@@ -486,7 +496,7 @@ public class TextRender {
         Rect area = getDrawArea(style);
         //srt无底部边距定义，视频内显示使用固定边距
         if (style == null || !style.hasMarginV()) {
-            return height - area.bottom + (10 * (height / 1080f));
+            return height - area.bottom + (srtBottomSpace * (height / 1080f));
         }
         float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
         float space = style.getMarginV() * scale;
@@ -613,9 +623,10 @@ public class TextRender {
     /**
      * 设置视频宽高比
      */
-    public void setAspectRatio(float aspectRatio) {
-        this.aspectRatio = aspectRatio;
+    public void setAspectRatio(int videoWidth, int videoHeight) {
+        this.aspectRatio = videoWidth * 1f / videoHeight;
         this.aspectRatioSet = true;
+        this.styledPaint.setVideoSize(videoWidth, videoHeight);
     }
 
     /**
@@ -638,5 +649,26 @@ public class TextRender {
      */
     public void setNotRenderBeforeAspectRatioSet(boolean notRenderBeforeAspectRatioSet) {
         this.notRenderBeforeAspectRatioSet = notRenderBeforeAspectRatioSet;
+    }
+
+    /**
+     * 设置入幕srt底部距离
+     */
+    public void setSrtBottomSpace(float srtBottomSpace) {
+        this.srtBottomSpace = srtBottomSpace;
+    }
+
+    /**
+     * 设置边框缩放
+     */
+    public void setStrokeScale(int strokeScale) {
+        this.styledPaint.setStrokeScale(strokeScale);
+    }
+
+    /**
+     * 设置边框圆角化
+     */
+    public void setRoundStroke(boolean roundStroke) {
+        this.styledPaint.setRoundStroke(roundStroke);
     }
 }

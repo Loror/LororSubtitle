@@ -39,9 +39,13 @@ public class StyledPaint {
     private int minTextSize = 6;//最小字体大小（像素，对standardWidth）
     private int screenWidth = 1920;
     private int screenHeight = 1080;
+    private int videoWidth = 1920;
+    private int videoHeight = 1080;
     protected float extraFontScale = 0.9f;//二级字体大小缩放
     private float fontScale = 1f;//字体大小缩放
     private int ptStandardWidth = 384;//默认pt->px转换宽度
+    private int strokeScale = 2;
+    private boolean roundStroke;
     private int ptWidth;
     private int ptHeight;
 
@@ -63,6 +67,11 @@ public class StyledPaint {
     public void setScreenSize(int screenWidth, int screenHeight) {
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
+    }
+
+    public void setVideoSize(int videoWidth, int videoHeight) {
+        this.videoWidth = videoWidth;
+        this.videoHeight = videoHeight;
     }
 
     public int getWidth() {
@@ -87,6 +96,14 @@ public class StyledPaint {
             return 20;
         }
         return ptWidth / 384f * 20;
+    }
+
+    public void setStrokeScale(int strokeScale) {
+        this.strokeScale = strokeScale;
+    }
+
+    public void setRoundStroke(boolean roundStroke) {
+        this.roundStroke = roundStroke;
     }
 
     public TextPaint getTextPaint() {
@@ -121,7 +138,7 @@ public class StyledPaint {
         int width = screenWidth;
         int height = screenHeight;
         if (width == 0 || height == 0) {
-            return 0;
+            return pt;
         }
         if (ptHeight != 0) {
             float scale = height * 1f / ptHeight;
@@ -165,6 +182,8 @@ public class StyledPaint {
             Typeface typeface = FontRender.findTypeface(extra.getFont());
             if (typeface != null) {
                 textPaint.setTypeface(typeface);
+            } else {
+                textPaint.setTypeface(Typeface.DEFAULT);
             }
             if (extra.hasFontSize()) {
                 float size = pt2Px(Math.max(extra.getFontSize(), minTextSize));
@@ -196,12 +215,18 @@ public class StyledPaint {
             if (extra.hasBorderWidth()) {
                 borderWidth = extra.getBorderWidth();
             }
-            if (extra.scaleBS && ptWidth > 0) {
-                shadowWidth = shadowWidth * screenWidth / ptWidth;
-                borderWidth = borderWidth * screenWidth / ptWidth;
+            //缩放模式按照字幕定义宽高缩放，非缩放模式按照视频大小缩放
+            if (extra.scaleBS) {
+                if (ptWidth > 0) {
+                    shadowWidth = shadowWidth * screenWidth / ptWidth;
+                    borderWidth = borderWidth * screenWidth / ptWidth;
+                }
+            } else {
+                shadowWidth = shadowWidth * screenWidth / videoWidth;
+                borderWidth = borderWidth * screenWidth / videoWidth;
             }
             if (borderWidth > 0) {
-                borderWidth = borderWidth * 2;
+                borderWidth = borderWidth * strokeScale;
             }
             textPaint.setStrokeWidth(borderWidth);
             float spacing = 0f;
@@ -242,6 +267,9 @@ public class StyledPaint {
                 textPaint.setStyle(Paint.Style.STROKE);
                 if (extra.alpha != 1f) {
                     borderColor = SubColorUtil.replaceColorAlpha(borderColor, (int) (255 * extra.alpha));
+                }
+                if (roundStroke) {
+                    textPaint.setStrokeJoin(Paint.Join.ROUND);
                 }
                 textPaint.setShadowLayer(0, 0, 0, Color.TRANSPARENT);
                 textPaint.setColor(borderColor);

@@ -37,10 +37,14 @@ public class LrcDecoder {
     }
 
     public List<LrcBean> decode(File file) {
+        return decode(file, "UTF-8");
+    }
+
+    public List<LrcBean> decode(File file, String charset) {
         mLrcs.clear();
         try {
             if (file.exists()) {
-                parse(new FileInputStream(file), "UTF-8");
+                parse(new FileInputStream(file), charset);
             }
         } catch (Exception e) {
             e.printStackTrace();

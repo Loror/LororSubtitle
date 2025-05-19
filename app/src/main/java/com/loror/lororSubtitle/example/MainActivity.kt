@@ -68,7 +68,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun initView() {
         //设置视频比例，以实际视频大小为准
-        binding.subtitle.render.setAspectRatio(1920f / 1080)
+        binding.subtitle.render.setAspectRatio(1920, 1080)
         //设置字幕显示到视频范围
         binding.subtitle.render.setLocateInVideo(true)
         runBlocking {

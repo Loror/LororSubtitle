@@ -70,6 +70,55 @@ public class SubtitlesDecoder {
 
     private final Map<String, Style> styles = new HashMap<>();
     private final List<String> subFormat = new ArrayList<>();
+    private final AssInfo assInfo = new AssInfo();
+
+    public static class AssInfo {
+        public int delay = 0;//整体延时
+        public int playResX = 0;//视频宽
+        public int playResY = 0;//视频高
+        public boolean scaleBS = false;//是否缩放字幕边框
+        public Integer wrap = null;//换行方式
+        public String format = "";//字幕格式化行
+
+        public void clear() {
+            delay = 0;
+            playResX = 0;
+            playResY = 0;
+            scaleBS = false;
+            wrap = null;
+            format = "";
+        }
+
+        public void copy(AssInfo to) {
+            to.delay = this.delay;
+            to.playResX = this.playResX;
+            to.playResY = this.playResY;
+            to.scaleBS = this.scaleBS;
+            to.wrap = this.wrap;
+            to.format = this.format;
+        }
+    }
+
+    /**
+     * 字幕格式化顺序
+     */
+    public List<String> getSubFormat() {
+        return subFormat;
+    }
+
+    /**
+     * ass基本信息
+     */
+    public AssInfo getAssInfo() {
+        return assInfo;
+    }
+
+    /**
+     * ass样式信息
+     */
+    public Map<String, Style> getStyles() {
+        return styles;
+    }
 
     /**
      * 读取本地文件
@@ -97,17 +146,16 @@ public class SubtitlesDecoder {
     }
 
     public List<SubtitlesModel> decode(InputStream inputStream, String charset) {
-        int delay = 0;
+        assInfo.clear();
         styles.clear();
         subFormat.clear();
-        int playResX = 0;
-        int playResY = 0;
-        boolean scaleBS = false;
-        Integer wrap = null;
-        String format = "";
         BufferedReader in = null;
         try {
-            in = new BufferedReader(new InputStreamReader(inputStream, charset));
+            if (charset == null) {
+                in = new BufferedReader(new InputStreamReader(inputStream));
+            } else {
+                in = new BufferedReader(new InputStreamReader(inputStream, charset));
+            }
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
             try {
@@ -132,8 +180,8 @@ public class SubtitlesDecoder {
             //ass字幕开始
             if (line.contains(ASS_HEAD)) {
                 mode = 1;
-                playResX = 384;
-                playResY = 288;
+                assInfo.playResX = 384;
+                assInfo.playResY = 288;
             }
             System.out.println("mode:" + mode + " line:" + line);
             while ((line = in.readLine()) != null) {
@@ -141,31 +189,31 @@ public class SubtitlesDecoder {
                     if (block == 0) {
                         if (line.startsWith(ASS_RES_X)) {
                             try {
-                                playResX = Integer.parseInt(line.replaceFirst(ASS_RES_X, "").trim());
+                                assInfo.playResX = Integer.parseInt(line.replaceFirst(ASS_RES_X, "").trim());
                             } catch (NumberFormatException e) {
                                 System.err.println("parse error playResX:" + line);
                             }
                         } else if (line.startsWith(ASS_RES_Y)) {
                             try {
-                                playResY = Integer.parseInt(line.replaceFirst(ASS_RES_Y, "").trim());
+                                assInfo.playResY = Integer.parseInt(line.replaceFirst(ASS_RES_Y, "").trim());
                             } catch (NumberFormatException e) {
                                 System.err.println("parse error playResY:" + line);
                             }
                         } else if (line.startsWith(ASS_DELAY)) {
                             try {
-                                delay = Integer.parseInt(line.replaceFirst(ASS_DELAY, "").trim());
+                                assInfo.delay = Integer.parseInt(line.replaceFirst(ASS_DELAY, "").trim());
                             } catch (NumberFormatException e) {
                                 System.err.println("parse error Delay:" + line);
                             }
                         } else if (line.startsWith(ASS_SCALE_BS)) {
                             try {
-                                scaleBS = line.replaceFirst(ASS_SCALE_BS, "").trim().equalsIgnoreCase("yes");
+                                assInfo.scaleBS = line.replaceFirst(ASS_SCALE_BS, "").trim().equalsIgnoreCase("yes");
                             } catch (NumberFormatException e) {
                                 System.err.println("parse error scaledBorderAndShadow:" + line);
                             }
                         } else if (line.startsWith(ASS_WRAP)) {
                             try {
-                                wrap = Integer.parseInt(line.replaceFirst(ASS_WRAP, "").trim());
+                                assInfo.wrap = Integer.parseInt(line.replaceFirst(ASS_WRAP, "").trim());
                             } catch (NumberFormatException e) {
                                 System.err.println("parse error scaledBorderAndShadow:" + line);
                             }
@@ -176,17 +224,17 @@ public class SubtitlesDecoder {
                         }
                     } else if (block == 1) {
                         if (line.startsWith(ASS_FORMAT)) {
-                            format = line.replaceFirst(ASS_FORMAT, "");
+                            assInfo.format = line.replaceFirst(ASS_FORMAT, "");
                         } else if (line.startsWith(ASS_STYLE)) {
                             String style = line.replaceFirst(ASS_STYLE, "");
                             try {
-                                Map<String, Style> nameStyle = parseStyle(format, style);
+                                Map<String, Style> nameStyle = parseStyle(assInfo.format, style);
                                 if (nameStyle != null) {
                                     for (Map.Entry<String, Style> item : nameStyle.entrySet()) {
                                         Style s = item.getValue();
                                         if (s != null) {
-                                            s.playResX = playResX;
-                                            s.playResY = playResY;
+                                            s.playResX = assInfo.playResX;
+                                            s.playResY = assInfo.playResY;
                                         }
                                         styles.put(item.getKey(), item.getValue());
                                     }
@@ -199,9 +247,9 @@ public class SubtitlesDecoder {
                         }
                     } else if (block == 2) {
                         if (line.startsWith(ASS_FORMAT)) {
-                            format = line.replaceFirst(ASS_FORMAT, "");
+                            assInfo.format = line.replaceFirst(ASS_FORMAT, "");
                             subFormat.clear();
-                            for (String s : format.split(",")) {
+                            for (String s : assInfo.format.split(",")) {
                                 subFormat.add(s.trim());
                             }
                         } else if (line.startsWith(ASS_START)) {
@@ -212,10 +260,10 @@ public class SubtitlesDecoder {
                                     SubtitlesModel sm = new SubtitlesModel();
                                     String[] times = m.group().split(",");
                                     sm.node = node++;
-                                    sm.star = getAssTime(times[0]) + delay;
-                                    sm.end = getAssTime(times[1]) + delay;
-                                    sm.playResX = playResX;
-                                    sm.playResY = playResY;
+                                    sm.star = getAssTime(times[0]) + assInfo.delay;
+                                    sm.end = getAssTime(times[1]) + assInfo.delay;
+                                    sm.playResX = assInfo.playResX;
+                                    sm.playResY = assInfo.playResY;
                                     int index = subFormat.indexOf("Text");
                                     //ass字幕字幕内容默认在第9个逗号之后
                                     sm.content = find(line, ',', index == -1 ? 9 : index);
@@ -243,7 +291,7 @@ public class SubtitlesDecoder {
 //                                extendStyle(sm, Extra.parseExtra(sm));
                                     list.add(sm);
                                     if (sm.style != null) {
-                                        sm.style.scaleBS = scaleBS;
+                                        sm.style.scaleBS = assInfo.scaleBS;
                                     }
                                 }
                             } catch (Exception e) {
@@ -314,8 +362,8 @@ public class SubtitlesDecoder {
                 model.sort = i;
                 model.type = mode;
                 if (model.style != null) {
-                    if (wrap != null) {
-                        model.style.setWrap(wrap);
+                    if (assInfo.wrap != null) {
+                        model.style.setWrap(assInfo.wrap);
                     }
                     //默认显示在下方
                     if (model.style.gravity == GRAVITY_UNSET && (!model.style.hasPositionX() && !model.style.hasPositionY() && !model.style.hasMoveAnimation())) {
@@ -598,7 +646,7 @@ public class SubtitlesDecoder {
     /**
      * 取出字幕特殊信息
      */
-    private void checkContent(SubtitlesModel content) {
+    public void checkContent(SubtitlesModel content) {
         if (TextUtils.isEmpty(content.content)) {
             return;
         }
@@ -1343,7 +1391,7 @@ public class SubtitlesDecoder {
     /**
      * 从字符串中查找指令，返回内容部分
      */
-    private static String find(String extra, String start, char end) {
+    public static String find(String extra, String start, char end) {
         if (TextUtils.isEmpty(extra)) {
             return null;
         }
@@ -1365,7 +1413,7 @@ public class SubtitlesDecoder {
     /**
      * 从字符串中查找times个code后内容
      */
-    private static String find(String text, char code, int times) {
+    public static String find(String text, char code, int times) {
         if (TextUtils.isEmpty(text)) {
             return null;
         }
