@@ -246,6 +246,7 @@ public class StyledPaint {
             if (extra.hasStrikeout()) {
                 textPaint.setStrikeThruText(extra.isStrikeout());
             }
+            textPaint.setStrokeJoin(Paint.Join.MITER);
             if (mode == MODE_SHADOW) {
                 float fontAlpha = Color.alpha(fontColor);
                 if (fontAlpha == 0) {
@@ -489,6 +490,7 @@ public class StyledPaint {
             textPaint.setXfermode(clearMode);
             canvas.drawText(text, start, end, x, y, textPaint);
             textPaint.setXfermode(null);
+            canvas.restoreToCount(layer);
         }
         //注意\be标签只会模糊文本的边框 ，不是整体。
         //注意\blur如果没有边框，那么文本整体就会被模糊。
@@ -518,9 +520,6 @@ public class StyledPaint {
             canvas.drawText(text, start, end, x, y, textPaint);
         }
         textPaint.setMaskFilter(null);
-        if (saveLayer) {
-            canvas.restoreToCount(layer);
-        }
     }
 
     private Typeface typeface;
