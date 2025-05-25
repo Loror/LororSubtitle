@@ -30,17 +30,19 @@ class MainActivity : AppCompatActivity() {
     private val update = object : Runnable {
 
         override fun run() {
+            var hasAnimation = false
             if (list.isNotEmpty()) {
                 val render = SubtitlesRender(list, player.current())
                 if (render != cRender) {
                     binding.subtitle.showModels(render)
                     cRender = render
+                    hasAnimation = render.isHasMove//返回字幕是否包含动画标签
                 }
             }
             if (player.end()) {
                 return
             }
-            handler.postDelayed(this, 30)
+            handler.postDelayed(this, if (hasAnimation) 30 else 200)//ass字幕支持动画，delay时间控制渲染帧率
         }
 
     }
