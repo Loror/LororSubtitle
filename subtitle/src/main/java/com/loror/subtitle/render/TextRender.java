@@ -14,6 +14,7 @@ import android.view.Gravity;
 import androidx.annotation.NonNull;
 
 import com.loror.subtitle.SubtitlesDecoder;
+import com.loror.subtitle.model.RenderedModel;
 import com.loror.subtitle.model.SubtitlesModel;
 
 import java.util.HashMap;
@@ -24,7 +25,7 @@ public class TextRender {
 
     public static final String TAG = "TextRender";
 
-    private final Map<Integer, List<SubtitlesModel>> showModels = new HashMap<>();
+    private final Map<Integer, RenderedModel> showModels = new HashMap<>();
     private CharSequence simpleText;
     private final StyledLayout styledLayout = new StyledLayout();
     private final StyledPaint styledPaint = new StyledPaint();
@@ -76,7 +77,7 @@ public class TextRender {
     public void setModels(SubtitlesRender render) {
         simpleText = null;
         showModels.clear();
-        Map<Integer, List<SubtitlesModel>> models = render.render();
+        Map<Integer, RenderedModel> models = render.render();
         if (models != null) {
             showModels.putAll(models);
         }
@@ -138,48 +139,68 @@ public class TextRender {
         if (showModels.isEmpty()) {
             return;
         }
-        List<SubtitlesModel> an1 = showModels.get(SubtitlesDecoder.GRAVITY_AN1);
+        RenderedModel an1 = showModels.get(SubtitlesDecoder.GRAVITY_AN1);
         if (an1 != null) {
-            drawBottom(an1, canvas, Gravity.LEFT);
+            for (List<SubtitlesModel> model : an1.getModels()) {
+                drawBottom(model, canvas, Gravity.LEFT);
+            }
         }
-        List<SubtitlesModel> an2 = showModels.get(SubtitlesDecoder.GRAVITY_AN2);
+        RenderedModel an2 = showModels.get(SubtitlesDecoder.GRAVITY_AN2);
         if (an2 != null) {
-            drawBottom(an2, canvas, Gravity.CENTER);
+            for (List<SubtitlesModel> model : an2.getModels()) {
+                drawBottom(model, canvas, Gravity.CENTER);
+            }
         }
-        List<SubtitlesModel> an3 = showModels.get(SubtitlesDecoder.GRAVITY_AN3);
+        RenderedModel an3 = showModels.get(SubtitlesDecoder.GRAVITY_AN3);
         if (an3 != null) {
-            drawBottom(an3, canvas, Gravity.RIGHT);
+            for (List<SubtitlesModel> model : an3.getModels()) {
+                drawBottom(model, canvas, Gravity.RIGHT);
+            }
         }
 
-        List<SubtitlesModel> an4 = showModels.get(SubtitlesDecoder.GRAVITY_AN4);
+        RenderedModel an4 = showModels.get(SubtitlesDecoder.GRAVITY_AN4);
         if (an4 != null) {
-            drawAn(an4, canvas, Gravity.LEFT, Gravity.CENTER);
+            for (List<SubtitlesModel> model : an4.getModels()) {
+                drawAn(model, canvas, Gravity.LEFT, Gravity.CENTER);
+            }
         }
-        List<SubtitlesModel> an5 = showModels.get(SubtitlesDecoder.GRAVITY_AN5);
+        RenderedModel an5 = showModels.get(SubtitlesDecoder.GRAVITY_AN5);
         if (an5 != null) {
-            drawAn(an5, canvas, Gravity.CENTER, Gravity.CENTER);
+            for (List<SubtitlesModel> model : an5.getModels()) {
+                drawAn(model, canvas, Gravity.CENTER, Gravity.CENTER);
+            }
         }
-        List<SubtitlesModel> an6 = showModels.get(SubtitlesDecoder.GRAVITY_AN6);
+        RenderedModel an6 = showModels.get(SubtitlesDecoder.GRAVITY_AN6);
         if (an6 != null) {
-            drawAn(an6, canvas, Gravity.RIGHT, Gravity.CENTER);
+            for (List<SubtitlesModel> model : an6.getModels()) {
+                drawAn(model, canvas, Gravity.RIGHT, Gravity.CENTER);
+            }
         }
 
-        List<SubtitlesModel> an7 = showModels.get(SubtitlesDecoder.GRAVITY_AN7);
+        RenderedModel an7 = showModels.get(SubtitlesDecoder.GRAVITY_AN7);
         if (an7 != null) {
-            drawAn(an7, canvas, Gravity.LEFT, Gravity.TOP);
+            for (List<SubtitlesModel> model : an7.getModels()) {
+                drawAn(model, canvas, Gravity.LEFT, Gravity.TOP);
+            }
         }
-        List<SubtitlesModel> an8 = showModels.get(SubtitlesDecoder.GRAVITY_AN8);
+        RenderedModel an8 = showModels.get(SubtitlesDecoder.GRAVITY_AN8);
         if (an8 != null) {
-            drawAn(an8, canvas, Gravity.CENTER, Gravity.TOP);
+            for (List<SubtitlesModel> model : an8.getModels()) {
+                drawAn(model, canvas, Gravity.CENTER, Gravity.TOP);
+            }
         }
-        List<SubtitlesModel> an9 = showModels.get(SubtitlesDecoder.GRAVITY_AN9);
+        RenderedModel an9 = showModels.get(SubtitlesDecoder.GRAVITY_AN9);
         if (an9 != null) {
-            drawAn(an9, canvas, Gravity.RIGHT, Gravity.TOP);
+            for (List<SubtitlesModel> model : an9.getModels()) {
+                drawAn(model, canvas, Gravity.RIGHT, Gravity.TOP);
+            }
         }
 
-        List<SubtitlesModel> un = showModels.get(SubtitlesDecoder.GRAVITY_UNSET);
+        RenderedModel un = showModels.get(SubtitlesDecoder.GRAVITY_UNSET);
         if (un != null) {
-            drawAbs(un, canvas);
+            for (List<SubtitlesModel> model : un.getModels()) {
+                drawAbs(model, canvas);
+            }
         }
     }
 
@@ -245,7 +266,7 @@ public class TextRender {
                     diff = totalHeight / 2;
                 }
                 offsetY -= diff;
-                boolean saved = updateCanvas(canvas, area, lines, x, y, offsetY, totalHeight, extra);
+                int count = updateCanvas(canvas, area, lines, x, y, offsetY, totalHeight, extra);
                 if (extra.currentScaleX != 1) {
                     styledPaint.getTextPaint().setTextScaleX(extra.currentScaleX);
                 } else {
@@ -273,13 +294,13 @@ public class TextRender {
                 }
                 styledPaint.getTextPaint().setTextScaleX(1);
                 extra.currentFontScale = savedFontScale;
-                if (saved) {
+                if (count != -1) {
                     try {
                         //投影仪抛出异常，投影仪degree为0.00时候save判断未进入
                         //这里判断（degree != 0）有概率进入，改为判断自定义变量
-                        canvas.restore();
+                        canvas.restoreToCount(count);
                     } catch (Exception e) {
-                        Log.e("Canvas", "restore failed(" + extra.currentDegree + "," + saved + "):" + subtitlesModel.content + "\n", e);
+                        Log.e("Canvas", "restore failed(" + extra.currentDegree + "," + count + "):" + subtitlesModel.content + "\n", e);
                     }
                 }
             }
@@ -289,26 +310,23 @@ public class TextRender {
     /**
      * 画布变化相关标签
      */
-    private boolean updateCanvas(Canvas canvas, Rect area, List<CharSequence> lines, float x, float y, float offsetY, float totalHeight, Style extra) {
-        boolean saved = false;
+    private int updateCanvas(Canvas canvas, Rect area, List<CharSequence> lines, float x, float y, float offsetY, float totalHeight, Style extra) {
+        int count = -1;
         if (extra.currentClip != null) {
             Rect clip = clipRect(extra, area, lines.size());
-            canvas.save();
-            saved = true;
+            count = canvas.save();
             canvas.clipRect(clip);
         }
         if (extra.currentDegree != 0) {
-            if (!saved) {
-                canvas.save();
-                saved = true;
+            if (count == -1) {
+                count = canvas.save();
             }
             float degree = -extra.currentDegree;
             canvas.rotate(degree, x, y + offsetY + totalHeight / 2);
         }
         if (extra.currentDegreeX != 0 || extra.currentDegreeY != 0) {
-            if (!saved) {
-                canvas.save();
-                saved = true;
+            if (count == -1) {
+                count = canvas.save();
             }
             float xd = (float) Math.cos(Math.toRadians(extra.currentDegreeY));
             float yd = (float) Math.cos(Math.toRadians(extra.currentDegreeX));
@@ -323,7 +341,7 @@ public class TextRender {
             }
             canvas.scale(xd, yd, finalX, y + offsetY + totalHeight);
         }
-        return saved;
+        return count;
     }
 
     /**
@@ -473,6 +491,10 @@ public class TextRender {
 
     private float getTopSpace(Style style) {
         if (!locateInVideo || !aspectRatioSet || style == null) {
+            if (style != null) {
+                float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
+                return topSpace + style.getMarginV() * scale;
+            }
             return topSpace;
         }
         float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
@@ -491,6 +513,11 @@ public class TextRender {
 
     private float getBottomSpace(Style style) {
         if (!locateInVideo || !aspectRatioSet) {
+            if (style != null) {
+                float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
+                float space = style.getMarginV() * scale;
+                return bottomSpace + space;
+            }
             return bottomSpace;
         }
         Rect area = getDrawArea(style);

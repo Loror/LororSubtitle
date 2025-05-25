@@ -10,6 +10,7 @@ import android.text.style.ForegroundColorSpan;
 import androidx.annotation.Nullable;
 
 import com.loror.subtitle.SubtitlesDecoder;
+import com.loror.subtitle.model.RenderedModel;
 import com.loror.subtitle.model.SubtitlesAnimation;
 import com.loror.subtitle.model.SubtitlesModel;
 import com.loror.subtitle.util.SubtitlesUtil;
@@ -102,11 +103,11 @@ public class SubtitlesRender {
         }
     }
 
-    public Map<Integer, List<SubtitlesModel>> render() {
+    public Map<Integer, RenderedModel> render() {
         if (models == null) {
             return null;
         }
-        final Map<Integer, List<SubtitlesModel>> showModels = new HashMap<>();
+        final Map<Integer, RenderedModel> showModels = new HashMap<>();
         for (SubtitlesModel sub : models) {
             sub.setRenderText(null);
             Style extra = sub.style;
@@ -157,28 +158,17 @@ public class SubtitlesRender {
                 }
                 renderAnimation(sub, extra);
             }
-            List<SubtitlesModel> item = showModels.get(gravity);
+            RenderedModel item = showModels.get(gravity);
             if (item == null) {
-                item = new ArrayList<>();
+                item = new RenderedModel(gravity);
                 showModels.put(gravity, item);
             }
             item.add(sub);
 //            android.util.Log.e(TAG, "gravity:" + gravity + "sub:" + sub);
         }
-        List<SubtitlesModel> list = showModels.get(SubtitlesDecoder.GRAVITY_AN2);
-        //底部字幕，ass重排序 后来居上，时间先开始局上
-        if (list != null && list.size() > 1) {
-            int type = list.get(0).type;
-            if (type == 1) {
-                Collections.reverse(list);
-                Collections.sort(list, (o1, o2) -> {
-                    int comp = Integer.compare(o1.layer, o2.layer);
-                    if (comp == 0) {
-                        return Long.compare(o1.star, o2.star);
-                    }
-                    return comp;
-                });
-            }
+        RenderedModel model = showModels.get(SubtitlesDecoder.GRAVITY_AN2);
+        if (model != null) {
+            model.sort();
         }
         return showModels;
     }

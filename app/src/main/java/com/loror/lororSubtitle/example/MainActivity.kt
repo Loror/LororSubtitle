@@ -25,20 +25,19 @@ class MainActivity : AppCompatActivity() {
 
     private val list = mutableListOf<SubtitlesModel>()
     private var cRender: SubtitlesRender? = null
-    private var time = 0
+    private val player = TimePlayer()
     private val handler = Handler(Looper.getMainLooper())
     private val update = object : Runnable {
 
         override fun run() {
             if (list.isNotEmpty()) {
-                val render = SubtitlesRender(list, time)
+                val render = SubtitlesRender(list, player.current())
                 if (render != cRender) {
                     binding.subtitle.showModels(render)
                     cRender = render
                 }
             }
-            time += 30
-            if (time > 10 * 60 * 1000) {
+            if (player.end()) {
                 return
             }
             handler.postDelayed(this, 30)

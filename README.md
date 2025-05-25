@@ -41,26 +41,23 @@ allprojects {
 
         override fun run() {
             if (list.isNotEmpty()) {
-                val render = SubtitlesRender(list, time)
+                val render = SubtitlesRender(list, player.current())
                 if (render != cRender) {
                     binding.subtitle.showModels(render)
                     cRender = render
                 }
             }
-            time += 30
-            if (time > 10 * 60 * 1000) {
+            if (player.end()) {
                 return
             }
-            handler.postDelayed(this, 30)
+            handler.postDelayed(this, 30)//ass字幕支持动画，delay时间控制渲染帧率
         }
 
     }
     
     private fun initView() {
         //设置视频比例，以实际视频大小为准
-        binding.subtitle.render.setAspectRatio(1920f / 1080)
-        //设置字幕显示到视频范围
-        binding.subtitle.render.setLocateInVideo(true)
+        binding.subtitle.render.setAspectRatio(1920, 1080)
         runBlocking {
             getSubtitle()
                 .catch {

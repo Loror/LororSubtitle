@@ -410,8 +410,33 @@ public class StyledPaint {
                 xStart = xEnd;
             }
         } else {
-            float textWidth = textPaint.measureText(text, start, end);
-            drawText(canvas, text, start, end, x, y, textWidth, current, null);
+            //倾倒文字
+            if (topStyle != null && topStyle.isFontFall()) {
+                float measureHeight = textPaint.descent() - textPaint.ascent();
+                int textLength = text.length();
+                float[] measures = new float[textLength];
+                float max = 0;
+                for (int i = 0; i < textLength; i++) {
+                    char c = text.charAt(i);
+                    measures[i] = textPaint.measureText(String.valueOf(c));
+                    if (measures[i] > max) {
+                        max = measures[i];
+                    }
+                }
+                float px = x + (measureHeight * textLength / 2f);
+                float py = y - max / 2;
+                int count = canvas.save();
+                canvas.rotate(-90, px, py);
+                for (int i = 0; i < textLength; i++) {
+                    char c = text.charAt(i);
+                    drawText(canvas, String.valueOf(c), 0, 1, px - measures[i] / 2f, py + (i + 1 - (textLength / 2f)) * measureHeight, measureHeight, current, null);
+//                    canvas.drawText(String.valueOf(c), px - measures[i] / 2f, py + (i + 1 - (textLength / 2f)) * measureHeight, paint);
+                }
+                canvas.restoreToCount(count);
+            } else {
+                float textWidth = textPaint.measureText(text, start, end);
+                drawText(canvas, text, start, end, x, y, textWidth, current, null);
+            }
         }
         return height != 0 ? height : (textPaint.descent() - textPaint.ascent());
     }

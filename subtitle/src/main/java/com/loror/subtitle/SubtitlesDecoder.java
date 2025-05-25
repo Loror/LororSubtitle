@@ -55,7 +55,7 @@ public class SubtitlesDecoder {
     private final static String ASS_RES_Y = "PlayResY: ";
     private final static String ASS_DELAY = "Delay: ";//自定义属性，非标
     private final static String ASS_SCALE_BS = "ScaledBorderAndShadow: ";
-    private final static String ASS_WRAP = "WrapStyle";
+    private final static String ASS_WRAP = "WrapStyle: ";
 
     public static final int GRAVITY_UNSET = 0;
     public static final int GRAVITY_AN1 = 1;
@@ -215,7 +215,7 @@ public class SubtitlesDecoder {
                             try {
                                 assInfo.wrap = Integer.parseInt(line.replaceFirst(ASS_WRAP, "").trim());
                             } catch (NumberFormatException e) {
-                                System.err.println("parse error scaledBorderAndShadow:" + line);
+                                System.err.println("parse error wrap:" + line);
                             }
                         } else if (line.trim().equalsIgnoreCase(ASS_HEAD_STYLE)
                                 || line.trim().equalsIgnoreCase(ASS_HEAD_STYLE_1)
@@ -269,6 +269,8 @@ public class SubtitlesDecoder {
                                     sm.content = find(line, ',', index == -1 ? 9 : index);
                                     if (sm.content == null) {
                                         sm.content = "";
+                                    } else {
+                                        sm.content = sm.content.toString().trim();
                                     }
                                     line = line.substring(ASS_START.length());
                                     index = subFormat.indexOf("Layer");
@@ -791,8 +793,10 @@ public class SubtitlesDecoder {
 //            contents.clear();
 //            contents.add(texts);
 //        }
+        //{=4}{\an1}字幕{\an2}{=5}字幕1{\an3}字幕2 出现非标签{}
         String text = "";
         boolean hasEnd = false;
+        boolean inMark = false;
         int end = -10;
         if (texts.length() > 2) {
             if (texts.charAt(0) != '{' || texts.charAt(1) != '\\') {
@@ -803,15 +807,18 @@ public class SubtitlesDecoder {
                 if (c == '{') {
                     if (i < texts.length() - 1 && texts.charAt(i + 1) == '\\') {
                         if (hasEnd) {
-                            if (end == i - 1) {
+                            if (end == i - 1 && inMark) {
                                 hasEnd = false;
                             } else {
                                 contents.add(text);
                                 text = "{";
                                 hasEnd = false;
+                                inMark = true;
                                 continue;
                             }
                         }
+                    } else {
+                        inMark = false;
                     }
                 } else if (c == '}') {
                     hasEnd = true;

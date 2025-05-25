@@ -82,6 +82,7 @@ public class FontRender {
             if (name.toLowerCase(Locale.getDefault()).endsWith(".ttf")) {
                 Typeface typeface = null;
                 String fontName = "";
+                String fileFontName = "";
                 try {
                     fontName = name.substring(0, name.length() - 4);
                     typeface = Typeface.createFromFile(file);
@@ -89,6 +90,7 @@ public class FontRender {
                     ttfParser.parse(file.getAbsolutePath());
                     String fName = ttfParser.getFontName();
                     if (!TextUtils.isEmpty(fName)) {
+                        fileFontName = fontName;
                         fontName = fName;
                     }
                 } catch (Exception e) {
@@ -96,6 +98,9 @@ public class FontRender {
                 }
                 if (typeface != null) {
                     loads.put(fontName, typeface);
+                    if (!TextUtils.isEmpty(fileFontName)) {
+                        loads.put(fileFontName, typeface);
+                    }
                     Log.d(TAG, "loadFont-> name:" + fontName);
                 }
             }
