@@ -17,6 +17,7 @@ import com.loror.subtitle.SubtitlesDecoder;
 import com.loror.subtitle.model.RenderedModel;
 import com.loror.subtitle.model.SubtitlesModel;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -371,7 +372,9 @@ public class TextRender {
             Style extra = subtitlesModel.style;
             styledPaint.setMode(StyledPaint.MODE_BODY);
             styledPaint.setPaint(extra);
-            List<CharSequence> lines = pageLines(subtitlesModel.text(), extra, xGravity == Gravity.CENTER ? 1 : boxSplit);
+            float left = getLeftSpace(extra);
+            float right = getRightSpace(extra);
+            List<CharSequence> lines = pageLines(subtitlesModel.text(), extra, (int) (width - left - right), xGravity == Gravity.CENTER ? 1 : boxSplit);
             if (bottom == -1) {
                 if (yGravity == Gravity.CENTER) {
                     float totalHeight = measureHeight(lines, extra);
@@ -386,8 +389,12 @@ public class TextRender {
                 float x = (width - measureWidth) / 2;
                 if (xGravity == Gravity.LEFT) {
                     x = getLeftSpace(extra);
+                    x += left;
                 } else if (xGravity == Gravity.RIGHT) {
                     x = width - measureWidth - getRightSpace(extra);
+                    x -= right;
+                } else {
+                    x += (left - right) / 2;
                 }
                 float lineHeight = styledPaint.measureHeight(text, extra);
                 if (TextUtils.isEmpty(text) || "\n".contentEquals(text)) {
@@ -406,6 +413,8 @@ public class TextRender {
      */
     private void drawBottom(List<SubtitlesModel> subtitlesModels, @NonNull Canvas canvas, int gravity) {
         float bottom = -1;
+        boolean checkSpace = mayDiffMarginH(subtitlesModels);
+        List<RangeH> ranges = null;
         for (int j = 0; j < subtitlesModels.size(); j++) {
             SubtitlesModel subtitlesModel = subtitlesModels.get(subtitlesModels.size() - 1 - j);
             Style extra = subtitlesModel.style;
@@ -421,8 +430,10 @@ public class TextRender {
             float left = getLeftSpace(extra);
             float right = getRightSpace(extra);
             List<CharSequence> lines = pageLines(subtitlesModel.text(), extra, (int) (width - left - right), gravity == Gravity.CENTER ? 1 : boxSplit);
-            bottom -= measureHeight(lines, extra);
-            float itemBottom = bottom;
+            float[] xs = new float[lines.size()];
+            float rangeLeft = -1;
+            float rangeRight = -1;
+            //计算各行绘制x坐标起点
             for (int i = 0; i < lines.size(); i++) {
                 CharSequence text = lines.get(i);
                 float measureWidth = styledPaint.measureText(text, 0, text.length(), extra);
@@ -436,16 +447,64 @@ public class TextRender {
                 } else {
                     x += (left - right) / 2;
                 }
+                xs[i] = x;
+                if (rangeLeft == -1) {
+                    rangeLeft = x;
+                } else if (x < rangeLeft) {
+                    rangeLeft = x;
+                }
+                if (rangeRight == -1) {
+                    rangeRight = x + measureWidth;
+                } else if (x + measureWidth > rangeRight) {
+                    rangeRight = x + measureWidth;
+                }
+            }
+            if (checkSpace) {
+                if (ranges == null) {
+                    ranges = new ArrayList<>();
+                }
+                RangeH range = findRange(ranges, rangeLeft, rangeRight, extra);
+                bottom = range.bottom;
+            }
+            bottom -= measureHeight(lines, extra);
+            float itemBottom = bottom;
+            for (int i = 0; i < lines.size(); i++) {
+                CharSequence text = lines.get(i);
                 float lineHeight = styledPaint.measureHeight(text, extra);
                 if (TextUtils.isEmpty(text) || "\n".contentEquals(text)) {
                     itemBottom += lineHeight / lineSplit;
                 } else {
                     itemBottom += lineHeight;
-                    styledPaint.drawText(canvas, text, x, itemBottom - styledPaint.descent(), extra);
+                    styledPaint.drawText(canvas, text, xs[i], itemBottom - styledPaint.descent(), extra);
                 }
                 itemBottom += lineSpace;
             }
         }
+    }
+
+    /**
+     * 存在不同横向margin。可能需要跌落
+     */
+    private boolean mayDiffMarginH(List<SubtitlesModel> subtitlesModels) {
+        if (subtitlesModels.size() < 2) {
+            return false;
+        }
+        SubtitlesModel model = subtitlesModels.get(0);
+        if (model.style == null) {
+            return false;
+        }
+        float l = model.style.getMarginL();
+        float r = model.style.getMarginR();
+        for (int i = 1; i < subtitlesModels.size(); i++) {
+            model = subtitlesModels.get(i);
+            if (model.style == null) {
+                return false;
+            }
+            if (model.style.getMarginL() != l || model.style.getMarginR() != r) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -578,7 +637,7 @@ public class TextRender {
     }
 
     private List<CharSequence> pageLines(CharSequence text, Style style, int split) {
-        return styledLayout.pageLines(text, styledPaint, style, width, split);
+        return pageLines(text, style, width, split);
     }
 
     private List<CharSequence> pageLines(CharSequence text, Style style, int width, int split) {
@@ -684,5 +743,56 @@ public class TextRender {
      */
     public void setRoundStroke(boolean roundStroke) {
         this.styledPaint.setRoundStroke(roundStroke);
+    }
+
+    /**
+     * 字幕横向显示范围
+     */
+    private static class RangeH {
+        float left;
+        float right;
+        float bottom;
+
+        void update(float left, float right) {
+            if (left < this.left) {
+                this.left = left;
+            }
+            if (right > this.right) {
+                this.right = right;
+            }
+        }
+    }
+
+    /**
+     * 查找当前横向显示范围
+     */
+    @NonNull
+    private RangeH findRange(List<RangeH> ranges, float rangeLeft, float rangeRight, Style extra) {
+        if (!ranges.isEmpty()) {
+            for (RangeH range : ranges) {
+                float mLeft = range.left;
+                float mRight = range.right;
+                if (rangeLeft > mLeft && rangeLeft < mRight) {
+                    range.update(rangeLeft, rangeRight);
+                    return range;
+                }
+                if (rangeLeft < mLeft) {
+                    if (rangeRight > mLeft) {
+                        range.update(rangeLeft, rangeRight);
+                        return range;
+                    }
+                }
+            }
+        }
+        RangeH range = new RangeH();
+        range.left = rangeLeft;
+        range.right = rangeRight;
+        int shadow = 3;
+        if (extra != null) {
+            shadow += (int) extra.getShadowWidth();
+        }
+        range.bottom = height - getBottomSpace(extra) - shadow;
+        ranges.add(range);
+        return range;
     }
 }
