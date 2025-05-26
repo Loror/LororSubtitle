@@ -41,7 +41,6 @@ public class TextRender {
     private int bottomSpace;//底部字幕避让位置
     private float aspectRatio = 16f / 9;//视频宽高比
     private boolean aspectRatioSet;//视频宽高比是否设置
-    private boolean locateInVideo = true;//字幕显示到视频范围（影响上下字幕）
     private boolean notRenderBeforeAspectRatioSet;//视频比例设置前不渲染
     private float srtBottomSpace = 60;//设置入幕srt底部距离
     private int width, height;//绘制宽高
@@ -94,14 +93,12 @@ public class TextRender {
         Rect r = canvas.getClipBounds();
         this.width = r.width();
         this.height = r.height();
-        if (locateInVideo && aspectRatioSet) {
-            Rect area = getDrawArea(null);
-            styledPaint.setScreenSize(area.width(), area.height());
-            vectorPaint.setScreenSize(area.width(), area.height());
-        } else {
-            styledPaint.setScreenSize(width, height);
-            vectorPaint.setScreenSize(width, height);
+        if (!aspectRatioSet && this.height != 0) {
+            aspectRatio = this.width * 1f / this.height;
         }
+        Rect area = getDrawArea(null);
+        styledPaint.setScreenSize(area.width(), area.height());
+        vectorPaint.setScreenSize(area.width(), area.height());
         drawText(canvas);
     }
 
@@ -139,6 +136,13 @@ public class TextRender {
         if (showModels.isEmpty()) {
             return;
         }
+        RenderedModel un = showModels.get(SubtitlesDecoder.GRAVITY_UNSET);
+        if (un != null) {
+            for (List<SubtitlesModel> model : un.getModels()) {
+                drawAbs(model, canvas);
+            }
+        }
+
         RenderedModel an1 = showModels.get(SubtitlesDecoder.GRAVITY_AN1);
         if (an1 != null) {
             for (List<SubtitlesModel> model : an1.getModels()) {
@@ -195,13 +199,6 @@ public class TextRender {
                 drawAn(model, canvas, Gravity.RIGHT, Gravity.TOP);
             }
         }
-
-        RenderedModel un = showModels.get(SubtitlesDecoder.GRAVITY_UNSET);
-        if (un != null) {
-            for (List<SubtitlesModel> model : un.getModels()) {
-                drawAbs(model, canvas);
-            }
-        }
     }
 
     /**
@@ -226,9 +223,7 @@ public class TextRender {
                     //注意：extra是复用对象，多线程执行render可能将其渲染回1
                     //字高根据实际视频高度计算，当前视频使用定高宽，绘制字体偏大，缩小避免绘制超出clip区域
                     //竖屏全屏宽高改变，计算异常
-                    if (!locateInVideo) {
-                        extra.currentFontScale = extra.currentFontScale * Math.min(1f, (width * 1f / height) / aspectRatio);
-                    }
+//                  extra.currentFontScale = extra.currentFontScale * Math.min(1f, (width * 1f / height) / aspectRatio);
                 }
                 styledPaint.setMode(StyledPaint.MODE_BODY);
                 styledPaint.setPaint(extra);
@@ -423,7 +418,9 @@ public class TextRender {
                 }
                 bottom = height - getBottomSpace(extra) - shadow;
             }
-            List<CharSequence> lines = pageLines(subtitlesModel.text(), extra, gravity == Gravity.CENTER ? 1 : boxSplit);
+            float left = getLeftSpace(extra);
+            float right = getRightSpace(extra);
+            List<CharSequence> lines = pageLines(subtitlesModel.text(), extra, (int) (width - left - right), gravity == Gravity.CENTER ? 1 : boxSplit);
             bottom -= measureHeight(lines, extra);
             float itemBottom = bottom;
             for (int i = 0; i < lines.size(); i++) {
@@ -432,8 +429,12 @@ public class TextRender {
                 float x = (width - measureWidth) / 2;
                 if (gravity == Gravity.LEFT) {
                     x = getLeftSpace(extra);
+                    x += left;
                 } else if (gravity == Gravity.RIGHT) {
                     x = width - measureWidth - getRightSpace(extra);
+                    x -= right;
+                } else {
+                    x += (left - right) / 2;
                 }
                 float lineHeight = styledPaint.measureHeight(text, extra);
                 if (TextUtils.isEmpty(text) || "\n".contentEquals(text)) {
@@ -481,7 +482,7 @@ public class TextRender {
     }
 
     private float getLeftSpace(Style style) {
-        if (!locateInVideo || !aspectRatioSet || style == null) {
+        if (style == null) {
             return leftSpace;
         }
         Rect area = getDrawArea(style);
@@ -490,11 +491,7 @@ public class TextRender {
     }
 
     private float getTopSpace(Style style) {
-        if (!locateInVideo || !aspectRatioSet || style == null) {
-            if (style != null) {
-                float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
-                return topSpace + style.getMarginV() * scale;
-            }
+        if (style == null) {
             return topSpace;
         }
         float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
@@ -503,7 +500,7 @@ public class TextRender {
     }
 
     private float getRightSpace(Style style) {
-        if (!locateInVideo || !aspectRatioSet || style == null) {
+        if (style == null) {
             return rightSpace;
         }
         Rect area = getDrawArea(style);
@@ -512,14 +509,6 @@ public class TextRender {
     }
 
     private float getBottomSpace(Style style) {
-        if (!locateInVideo || !aspectRatioSet) {
-            if (style != null) {
-                float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
-                float space = style.getMarginV() * scale;
-                return bottomSpace + space;
-            }
-            return bottomSpace;
-        }
         Rect area = getDrawArea(style);
         //srt无底部边距定义，视频内显示使用固定边距
         if (style == null || !style.hasMarginV()) {
@@ -560,14 +549,15 @@ public class TextRender {
             }
         } else {
             //默认样式，使用画布大小
-            if (style == null || (style.playResX == 384 && style.playResY == 288)) {
+            if (style == null) {
                 rect.right = width;
                 rect.bottom = height;
             } else {
+                float aspectRatio = style.playResX * 1f / style.playResY;
                 //实际显示宽屏，宽需要重定
-                if (width * 1f / height > style.playResX * 1f / style.playResY) {
+                if (width * 1f / height > aspectRatio) {
                     rect.bottom = height;
-                    int styleWidth = (int) ((style.playResX / (width * 1f / height * style.playResY)) * width);
+                    int styleWidth = (int) ((aspectRatio / (width * 1f / height)) * width);
                     if (styleWidth <= 0) {
                         styleWidth = width;
                     }
@@ -575,7 +565,7 @@ public class TextRender {
                     rect.right = rect.left + styleWidth;
                 } else {
                     rect.right = width;
-                    int styleHeight = (int) ((style.playResY / (height * 1f / width * style.playResX)) * height);
+                    int styleHeight = (int) (1 / aspectRatio / (height * 1f / width) * height);
                     if (styleHeight <= 0) {
                         styleHeight = height;
                     }
@@ -588,6 +578,10 @@ public class TextRender {
     }
 
     private List<CharSequence> pageLines(CharSequence text, Style style, int split) {
+        return styledLayout.pageLines(text, styledPaint, style, width, split);
+    }
+
+    private List<CharSequence> pageLines(CharSequence text, Style style, int width, int split) {
         return styledLayout.pageLines(text, styledPaint, style, width, split);
     }
 
@@ -662,13 +656,6 @@ public class TextRender {
     public void resetAspectRatio() {
         this.aspectRatio = 16f / 9;
         this.aspectRatioSet = false;
-    }
-
-    /**
-     * 字幕显示到视频范围
-     */
-    public void setLocateInVideo(boolean locateInVideo) {
-        this.locateInVideo = locateInVideo;
     }
 
     /**

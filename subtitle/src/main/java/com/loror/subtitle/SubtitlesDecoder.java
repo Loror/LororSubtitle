@@ -43,6 +43,8 @@ public class SubtitlesDecoder {
      */
     private final static String SRT_TIME_EXPRESS = "\\d\\d:\\d\\d:\\d\\d,\\d\\d\\d --> \\d\\d:\\d\\d:\\d\\d,\\d\\d\\d";
     private final static String ASS_TIME_EXPRESS = "\\d:\\d\\d:\\d\\d\\.\\d\\d,\\d:\\d\\d:\\d\\d\\.\\d\\d";
+
+    //ass [Script Info]标签
     private final static String ASS_HEAD = "[Script Info]";
     private final static String ASS_HEAD_STYLE = "[V4+ Styles]";
     private final static String ASS_HEAD_STYLE_1 = "[V4 Styles]";
@@ -56,6 +58,16 @@ public class SubtitlesDecoder {
     private final static String ASS_DELAY = "Delay: ";//自定义属性，非标
     private final static String ASS_SCALE_BS = "ScaledBorderAndShadow: ";
     private final static String ASS_WRAP = "WrapStyle: ";
+
+    //ass format标签
+    private final static String ASS_DIALOGUE_START = "Start";
+    private final static String ASS_DIALOGUE_END = "End";
+    private final static String ASS_DIALOGUE_LAYER = "Layer";
+    private final static String ASS_DIALOGUE_STYLE = "Style";
+    private final static String ASS_DIALOGUE_MARGIN_L = "MarginL";
+    private final static String ASS_DIALOGUE_MARGIN_R = "MarginR";
+    private final static String ASS_DIALOGUE_MARGIN_V = "MarginV";
+    private final static String ASS_DIALOGUE_TEXT = "Text";
 
     public static final int GRAVITY_UNSET = 0;
     public static final int GRAVITY_AN1 = 1;
@@ -71,6 +83,7 @@ public class SubtitlesDecoder {
     private final Map<String, Style> styles = new HashMap<>();
     private final List<String> subFormat = new ArrayList<>();
     private final AssInfo assInfo = new AssInfo();
+    private boolean ignorePath = true;//是否忽略绘画标签
 
     public static class AssInfo {
         public int delay = 0;//整体延时
@@ -118,6 +131,13 @@ public class SubtitlesDecoder {
      */
     public Map<String, Style> getStyles() {
         return styles;
+    }
+
+    /**
+     * 是否忽略绘画标签
+     */
+    public void setIgnorePath(boolean ignorePath) {
+        this.ignorePath = ignorePath;
     }
 
     /**
@@ -253,48 +273,90 @@ public class SubtitlesDecoder {
                                 subFormat.add(s.trim());
                             }
                         } else if (line.startsWith(ASS_START)) {
+                            if (ignorePath && line.contains("{\\p0}")) {
+                                continue;
+                            }
                             try {
-                                Pattern p = Pattern.compile(ASS_TIME_EXPRESS);
-                                Matcher m = p.matcher(line);
-                                if (m.find()) {
-                                    SubtitlesModel sm = new SubtitlesModel();
-                                    String[] times = m.group().split(",");
-                                    sm.node = node++;
-                                    sm.star = getAssTime(times[0]) + assInfo.delay;
-                                    sm.end = getAssTime(times[1]) + assInfo.delay;
-                                    sm.playResX = assInfo.playResX;
-                                    sm.playResY = assInfo.playResY;
-                                    int index = subFormat.indexOf("Text");
-                                    //ass字幕字幕内容默认在第9个逗号之后
-                                    sm.content = find(line, ',', index == -1 ? 9 : index);
-                                    if (sm.content == null) {
-                                        sm.content = "";
-                                    } else {
-                                        sm.content = sm.content.toString().trim();
+                                line = line.substring(ASS_START.length());
+                                //ass字幕字幕内容默认在第9个逗号之后
+                                int index = subFormat.indexOf(ASS_DIALOGUE_TEXT);
+                                String[] texts = splitByCode(line, ',', index == -1 ? 9 : index);
+                                String[] form;
+                                String text;
+                                if (texts.length == 2) {
+                                    text = texts[1];
+                                    form = texts[0].split(",");
+                                } else {
+                                    continue;
+                                }
+                                index = subFormat.indexOf(ASS_DIALOGUE_START);
+                                if (index == -1) {
+                                    continue;
+                                }
+                                String startTime = form[index];
+                                index = subFormat.indexOf(ASS_DIALOGUE_END);
+                                if (index == -1) {
+                                    continue;
+                                }
+                                String endTime = form[index];
+                                index = subFormat.indexOf(ASS_DIALOGUE_LAYER);
+                                String layer = null;
+                                if (index != -1) {
+                                    layer = form[index];
+                                }
+                                index = subFormat.indexOf(ASS_DIALOGUE_STYLE);
+                                String style = null;
+                                if (index != -1) {
+                                    style = form[index];
+                                }
+                                index = subFormat.indexOf(ASS_DIALOGUE_MARGIN_L);
+                                String marginL = null;
+                                if (index != -1) {
+                                    marginL = form[index];
+                                }
+                                index = subFormat.indexOf(ASS_DIALOGUE_MARGIN_R);
+                                String marginR = null;
+                                if (index != -1) {
+                                    marginR = form[index];
+                                }
+                                index = subFormat.indexOf(ASS_DIALOGUE_MARGIN_V);
+                                String marginV = null;
+                                if (index != -1) {
+                                    marginV = form[index];
+                                }
+                                //=======================获取字段结束===========================
+
+                                SubtitlesModel sm = new SubtitlesModel();
+                                sm.node = node++;
+                                sm.star = getAssTime(startTime) + assInfo.delay;
+                                sm.end = getAssTime(endTime) + assInfo.delay;
+                                sm.playResX = assInfo.playResX;
+                                sm.playResY = assInfo.playResY;
+                                sm.content = text;
+                                if (sm.content == null) {
+                                    sm.content = "";
+                                } else {
+                                    sm.content = sm.content.toString().trim();
+                                }
+                                if (layer != null) {
+                                    try {
+                                        sm.layer = Integer.parseInt(layer);
+                                    } catch (Exception e) {
+//                                        e.printStackTrace();
+                                        System.err.println("parse error layer:" + layer);
                                     }
-                                    line = line.substring(ASS_START.length());
-                                    index = subFormat.indexOf("Layer");
-                                    if (index != -1) {
-                                        String l = find(line, ',', index);
-                                        try {
-                                            sm.layer = Integer.parseInt(l.split(",")[0]);
-                                        } catch (Exception e) {
-                                            e.printStackTrace();
-                                        }
-                                    }
-                                    //继承v4样式
-                                    index = subFormat.indexOf("Style");
-                                    sm.styleName = find(line, ',', index == -1 ? 3 : index);
-                                    if (!TextUtils.isEmpty(sm.styleName)) {
-                                        sm.styleName = sm.styleName.split(",")[0];
-                                    }
-                                    checkContent(sm);
+                                }
+                                //继承v4样式
+                                if (style != null) {
+                                    sm.styleName = style;
+                                }
+                                checkContent(sm);
+                                checkMargin(sm, marginL, marginR, marginV);
 //                                extendStyle(sm, getStyleByName(sm.styleName));
 //                                extendStyle(sm, Extra.parseExtra(sm));
-                                    list.add(sm);
-                                    if (sm.style != null) {
-                                        sm.style.scaleBS = assInfo.scaleBS;
-                                    }
+                                list.add(sm);
+                                if (sm.style != null) {
+                                    sm.style.scaleBS = assInfo.scaleBS;
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();
@@ -731,9 +793,11 @@ public class SubtitlesDecoder {
                             base = style;
                             SpannableStringBuilder builder = new SpannableStringBuilder();
                             builder.append(data);
-                            StyledSpan styledSpan = new StyledSpan(style);
-                            builder.setSpan(styledSpan, 0, data.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                            hasSpan = true;
+                            if (builder.length() > 0) {
+                                StyledSpan styledSpan = new StyledSpan(style);
+                                builder.setSpan(styledSpan, 0, data.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                hasSpan = true;
+                            }
                             result.append(builder);
                         }
                     }
@@ -768,6 +832,45 @@ public class SubtitlesDecoder {
     }
 
     /**
+     * 行定义了marginV，使用行定义
+     */
+    public void checkMargin(SubtitlesModel sm, String marginL, String marginR, String marginV) {
+        if (sm.style == null) {
+            return;
+        }
+        if (marginV != null) {
+            try {
+                int m = Integer.parseInt(marginV);
+                if (m != 0) {
+                    sm.style.setMarginV(marginV);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (marginL != null) {
+            try {
+                int m = Integer.parseInt(marginL);
+                if (m != 0) {
+                    sm.style.setMarginL(marginL);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (marginR != null) {
+            try {
+                int m = Integer.parseInt(marginR);
+                if (m != 0) {
+                    sm.style.setMarginR(marginR);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
      * 将字幕内容按样式分组
      */
     private static List<String> splitContent(CharSequence content) {
@@ -794,7 +897,7 @@ public class SubtitlesDecoder {
 //            contents.add(texts);
 //        }
         //{=4}{\an1}字幕{\an2}{=5}字幕1{\an3}字幕2 出现非标签{}
-        String text = "";
+        StringBuilder text = new StringBuilder();
         boolean hasEnd = false;
         boolean inMark = false;
         int end = -10;
@@ -810,8 +913,8 @@ public class SubtitlesDecoder {
                             if (end == i - 1 && inMark) {
                                 hasEnd = false;
                             } else {
-                                contents.add(text);
-                                text = "{";
+                                contents.add(text.toString());
+                                text = new StringBuilder("{");
                                 hasEnd = false;
                                 inMark = true;
                                 continue;
@@ -824,10 +927,10 @@ public class SubtitlesDecoder {
                     hasEnd = true;
                     end = i;
                 }
-                text += c;
+                text.append(c);
             }
-            if (!text.isEmpty()) {
-                contents.add(text);
+            if (text.length() != 0) {
+                contents.add(text.toString());
             }
         } else {
             contents.add(texts);
@@ -1404,15 +1507,15 @@ public class SubtitlesDecoder {
         }
         int index = extra.indexOf(start);
         if (index != -1) {
-            String text = "";
+            StringBuilder text = new StringBuilder();
             for (int i = index + start.length(); i < extra.length(); i++) {
                 char c = extra.charAt(i);
                 if (c == end || c == '\\' || c == '}') {
                     break;
                 }
-                text += c;
+                text.append(c);
             }
-            return text;
+            return text.toString();
         }
         return null;
     }
@@ -1420,6 +1523,7 @@ public class SubtitlesDecoder {
     /**
      * 从字符串中查找times个code后内容
      */
+    @Deprecated
     public static String find(String text, char code, int times) {
         if (TextUtils.isEmpty(text)) {
             return null;
@@ -1436,6 +1540,30 @@ public class SubtitlesDecoder {
             }
         }
         return result;
+    }
+
+    /**
+     * 从字符串中查找times个code后内容，并分成两部分
+     */
+    public static String[] splitByCode(String text, char code, int times) {
+        if (TextUtils.isEmpty(text)) {
+            return new String[]{text};
+        }
+        StringBuilder other = new StringBuilder();
+        StringBuilder result = new StringBuilder();
+        int find = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (find >= times) {
+                result.append(c);
+            } else {
+                other.append(c);
+            }
+            if (c == code) {
+                find++;
+            }
+        }
+        return new String[]{other.toString(), result.toString()};
     }
 
 }
