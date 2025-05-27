@@ -79,19 +79,22 @@ public class FontRender {
         for (File file : files) {
             String name = file.getName();
             //Typeface支持ttc，但暂时无法获取ttc名称
-            if (name.toLowerCase(Locale.getDefault()).endsWith(".ttf")) {
+            int type = getFontType(name);
+            if (type > 0) {
                 Typeface typeface = null;
                 String fontName = "";
                 String fileFontName = "";
                 try {
                     fontName = name.substring(0, name.length() - 4);
                     typeface = Typeface.createFromFile(file);
-                    TTFParser ttfParser = new TTFParser();
-                    ttfParser.parse(file.getAbsolutePath());
-                    String fName = ttfParser.getFontName();
-                    if (!TextUtils.isEmpty(fName)) {
-                        fileFontName = fontName;
-                        fontName = fName;
+                    if (type == 1) {
+                        TTFParser ttfParser = new TTFParser();
+                        ttfParser.parse(file.getAbsolutePath());
+                        String fName = ttfParser.getFontName();
+                        if (!TextUtils.isEmpty(fName)) {
+                            fileFontName = fontName;
+                            fontName = fName;
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -111,5 +114,23 @@ public class FontRender {
                 fonts.putAll(loads);
             }
         }
+    }
+
+    /**
+     * 0 未知
+     * 1 ttf
+     * 2 otf
+     * 3 ttc
+     */
+    private static int getFontType(String name) {
+        String lowerName = name.toLowerCase(Locale.getDefault());
+        if (lowerName.endsWith(".ttf")) {
+            return 1;
+        } else if (lowerName.endsWith(".otf")) {
+            return 2;
+        } else if (lowerName.endsWith(".ttc")) {
+            return 2;
+        }
+        return 0;
     }
 }

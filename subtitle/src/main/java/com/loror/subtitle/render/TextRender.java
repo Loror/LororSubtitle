@@ -232,7 +232,6 @@ public class TextRender {
 //                float x = extra.x * getWidth();
                 List<CharSequence> lines = styledLayout.pageLines(subtitlesModel.text(), styledPaint, extra, width, 1);
                 float y = extra.y * area.height() + area.top;
-                float offsetY = 0;
                 float totalHeight = measureHeight(lines, extra);
                 if (lines.size() > 1) {
                     //所需绘制文字总高超过屏幕，缩放到屏幕能容纳
@@ -248,26 +247,27 @@ public class TextRender {
                 }
                 //字幕行的行对齐方式决定了位置设定的参考点。
                 //举例来说，当行对齐设定为左上时，字幕行的左上角会被放置在 \pos 指定的位置，对于底部中间对齐来说，字幕的底部中间位置将会被放置在指定的坐标上。
-                float diff;
+                float offsetY;
                 if (extra.gravity == SubtitlesDecoder.GRAVITY_AN7 || extra.gravity == SubtitlesDecoder.GRAVITY_AN8 || extra.gravity == SubtitlesDecoder.GRAVITY_AN9) {
                     //顶部
-                    diff = 0;
+                    offsetY = 0;
                 } else if (extra.gravity == SubtitlesDecoder.GRAVITY_AN1 || extra.gravity == SubtitlesDecoder.GRAVITY_AN2 || extra.gravity == SubtitlesDecoder.GRAVITY_AN3) {
                     //底部
-                    diff = totalHeight;
+                    offsetY = totalHeight;
                 } else if (extra.gravity == SubtitlesDecoder.GRAVITY_UNSET) {
-                    diff = 0;
+                    offsetY = 0;
                 } else {
                     //中部
-                    diff = totalHeight / 2;
+                    offsetY = totalHeight / 2;
                 }
-                offsetY -= diff;
-                int count = updateCanvas(canvas, area, lines, x, y, offsetY, totalHeight, extra);
                 if (extra.currentScaleX != 1) {
                     styledPaint.getTextPaint().setTextScaleX(extra.currentScaleX);
                 } else {
                     styledPaint.getTextPaint().setTextScaleX(1);
                 }
+                float[] xs = new float[lines.size()];
+                float rangeLeft = -1;
+                float rangeRight = -1;
                 for (int i = 0; i < lines.size(); i++) {
                     CharSequence text = lines.get(i);
                     float measureWidth = styledPaint.measureText(text, 0, text.length(), extra);
@@ -279,12 +279,27 @@ public class TextRender {
                     } else {
                         finalX = x;
                     }
+                    xs[i] = finalX;
+                    if (rangeLeft == -1) {
+                        rangeLeft = finalX;
+                    } else if (finalX < rangeLeft) {
+                        rangeLeft = finalX;
+                    }
+                    if (rangeRight == -1) {
+                        rangeRight = finalX + measureWidth;
+                    } else if (finalX + measureWidth > rangeRight) {
+                        rangeRight = finalX + measureWidth;
+                    }
+                }
+                int count = updateCanvas(canvas, area, lines, rangeLeft, y - offsetY, rangeRight, y - offsetY + totalHeight, extra);
+                for (int i = 0; i < lines.size(); i++) {
+                    CharSequence text = lines.get(i);
                     if (TextUtils.isEmpty(text) || "\n".contentEquals(text)) {
                         y += styledPaint.measureHeight(text, extra) / lineSplit + lineSpace;
                     } else {
                         float lineHeight = styledPaint.measureHeight(text, extra);
                         y += lineHeight;
-                        styledPaint.drawText(canvas, text, finalX, y + offsetY - styledPaint.descent(), extra);
+                        styledPaint.drawText(canvas, text, xs[i], y - offsetY - styledPaint.descent(), extra);
                         y += lineSpace;
                     }
                 }
@@ -304,64 +319,6 @@ public class TextRender {
     }
 
     /**
-     * 画布变化相关标签
-     */
-    private int updateCanvas(Canvas canvas, Rect area, List<CharSequence> lines, float x, float y, float offsetY, float totalHeight, Style extra) {
-        int count = -1;
-        if (extra.currentClip != null) {
-            Rect clip = clipRect(extra, area, lines.size());
-            count = canvas.save();
-            canvas.clipRect(clip);
-        }
-        if (extra.currentDegree != 0) {
-            if (count == -1) {
-                count = canvas.save();
-            }
-            float degree = -extra.currentDegree;
-            canvas.rotate(degree, x, y + offsetY + totalHeight / 2);
-        }
-        if (extra.currentDegreeX != 0 || extra.currentDegreeY != 0) {
-            if (count == -1) {
-                count = canvas.save();
-            }
-            float xd = (float) Math.cos(Math.toRadians(extra.currentDegreeY));
-            float yd = (float) Math.cos(Math.toRadians(extra.currentDegreeX));
-            float totalWidth = measureWidth(lines, extra);
-            float finalX;
-            if (extra.gravity == SubtitlesDecoder.GRAVITY_AN2 || extra.gravity == SubtitlesDecoder.GRAVITY_AN5 || extra.gravity == SubtitlesDecoder.GRAVITY_AN8 || extra.gravity == SubtitlesDecoder.GRAVITY_UNSET) {
-                finalX = x;
-            } else if (extra.gravity == SubtitlesDecoder.GRAVITY_AN3 || extra.gravity == SubtitlesDecoder.GRAVITY_AN6 || extra.gravity == SubtitlesDecoder.GRAVITY_AN9) {
-                finalX = x - totalWidth / 2;
-            } else {
-                finalX = x + totalWidth / 2;
-            }
-            canvas.scale(xd, yd, finalX, y + offsetY + totalHeight);
-        }
-        return count;
-    }
-
-    /**
-     * 获取clip范围
-     */
-    private Rect clipRect(Style clip, Rect area, int line) {
-        if (clip == null) {
-            return null;
-        }
-        //竖屏字体放大，坐标不能完全重合，取消clip
-//        if (getWidth() * 1f / getHeight() < 1.4) {
-//            return null;
-//        }
-        SubtitlesModel.Extent in = clip.currentClip;
-//        float diff = in.left * getWidth() - in.left * area.height();
-        float diff = in.left;
-        float extraHeight = Math.max(line - 1, 0) * lineSpace;
-        return new Rect(Math.max((int) (in.left * width - diff), 0),
-                (int) (in.top * area.height() + area.top - extraHeight),
-                Math.min((int) (in.right * width + diff), width),
-                (int) (in.bottom * area.height() + area.top + extraHeight));
-    }
-
-    /**
      * 绘制顶部文字an7、an8、an9
      * 绘制中间文字an4、an5、an6
      */
@@ -375,35 +332,55 @@ public class TextRender {
             float left = getLeftSpace(extra);
             float right = getRightSpace(extra);
             List<CharSequence> lines = pageLines(subtitlesModel.text(), extra, (int) (width - left - right), xGravity == Gravity.CENTER ? 1 : boxSplit);
+            float totalHeight = measureHeight(lines, extra);
             if (bottom == -1) {
                 if (yGravity == Gravity.CENTER) {
-                    float totalHeight = measureHeight(lines, extra);
                     bottom = (height - totalHeight) / 2;
                 } else {
                     bottom = getTopSpace(extra);
                 }
             }
+            float[] xs = new float[lines.size()];
+            float rangeLeft = -1;
+            float rangeRight = -1;
             for (int i = 0; i < lines.size(); i++) {
                 CharSequence text = lines.get(i);
                 float measureWidth = styledPaint.measureText(text, 0, text.length(), extra);
                 float x = (width - measureWidth) / 2;
                 if (xGravity == Gravity.LEFT) {
-                    x = getLeftSpace(extra);
-                    x += left;
+                    x = left;
                 } else if (xGravity == Gravity.RIGHT) {
-                    x = width - measureWidth - getRightSpace(extra);
-                    x -= right;
+                    x = width - measureWidth - right;
                 } else {
                     x += (left - right) / 2;
                 }
+                xs[i] = x;
+                if (rangeLeft == -1) {
+                    rangeLeft = x;
+                } else if (x < rangeLeft) {
+                    rangeLeft = x;
+                }
+                if (rangeRight == -1) {
+                    rangeRight = x + measureWidth;
+                } else if (x + measureWidth > rangeRight) {
+                    rangeRight = x + measureWidth;
+                }
+            }
+            Rect area = getDrawArea(extra);
+            int count = updateCanvas(canvas, area, lines, rangeLeft, bottom, rangeRight, bottom + totalHeight, extra);
+            for (int i = 0; i < lines.size(); i++) {
+                CharSequence text = lines.get(i);
                 float lineHeight = styledPaint.measureHeight(text, extra);
                 if (TextUtils.isEmpty(text) || "\n".contentEquals(text)) {
                     bottom += lineHeight / lineSplit;
                 } else {
                     bottom += lineHeight;
-                    styledPaint.drawText(canvas, text, x, bottom - styledPaint.descent(), extra);
+                    styledPaint.drawText(canvas, text, xs[i], bottom - styledPaint.descent(), extra);
                 }
                 bottom += lineSpace;
+            }
+            if (count != -1) {
+                canvas.restoreToCount(count);
             }
         }
     }
@@ -439,11 +416,9 @@ public class TextRender {
                 float measureWidth = styledPaint.measureText(text, 0, text.length(), extra);
                 float x = (width - measureWidth) / 2;
                 if (gravity == Gravity.LEFT) {
-                    x = getLeftSpace(extra);
-                    x += left;
+                    x = left;
                 } else if (gravity == Gravity.RIGHT) {
-                    x = width - measureWidth - getRightSpace(extra);
-                    x -= right;
+                    x = width - measureWidth - right;
                 } else {
                     x += (left - right) / 2;
                 }
@@ -459,14 +434,21 @@ public class TextRender {
                     rangeRight = x + measureWidth;
                 }
             }
+            RangeH range = null;
             if (checkSpace) {
                 if (ranges == null) {
                     ranges = new ArrayList<>();
                 }
-                RangeH range = findRange(ranges, rangeLeft, rangeRight, extra);
+                range = findRange(ranges, rangeLeft, rangeRight, extra);
                 bottom = range.bottom;
             }
-            bottom -= measureHeight(lines, extra);
+            float totalHeight = measureHeight(lines, extra);
+            bottom -= totalHeight;
+            if (range != null) {
+                range.bottom = bottom;
+            }
+            Rect area = getDrawArea(extra);
+            int count = updateCanvas(canvas, area, lines, rangeLeft, bottom, rangeRight, bottom + totalHeight, extra);
             float itemBottom = bottom;
             for (int i = 0; i < lines.size(); i++) {
                 CharSequence text = lines.get(i);
@@ -479,7 +461,88 @@ public class TextRender {
                 }
                 itemBottom += lineSpace;
             }
+            if (count != -1) {
+                canvas.restoreToCount(count);
+            }
         }
+    }
+
+    /**
+     * 画布变化相关标签
+     */
+    private int updateCanvas(Canvas canvas, Rect area, List<CharSequence> lines, float left, float top, float right, float bottom, Style extra) {
+        int count = -1;
+        if (extra == null) {
+            return count;
+        }
+
+        if (extra.currentClip == null && extra.currentDegree == 0 && extra.currentDegreeX == 0 && extra.currentDegreeY == 0) {
+            return count;
+        }
+
+        float x;
+        float y;
+        //an7 an8 an9
+        //an4 an5 an6
+        //an1 an2 an3
+        //旋转中心点基于an
+        if (extra.gravity == SubtitlesDecoder.GRAVITY_AN2 || extra.gravity == SubtitlesDecoder.GRAVITY_AN5 || extra.gravity == SubtitlesDecoder.GRAVITY_AN8 || extra.gravity == SubtitlesDecoder.GRAVITY_UNSET) {
+            x = (right - left) / 2 + left;
+        } else if (extra.gravity == SubtitlesDecoder.GRAVITY_AN3 || extra.gravity == SubtitlesDecoder.GRAVITY_AN6 || extra.gravity == SubtitlesDecoder.GRAVITY_AN9) {
+            x = right;
+        } else {
+            x = left;
+        }
+        if (extra.gravity == SubtitlesDecoder.GRAVITY_AN4 || extra.gravity == SubtitlesDecoder.GRAVITY_AN5 || extra.gravity == SubtitlesDecoder.GRAVITY_AN6 || extra.gravity == SubtitlesDecoder.GRAVITY_UNSET) {
+            y = (bottom - top) / 2 + top;
+        } else if (extra.gravity == SubtitlesDecoder.GRAVITY_AN7 || extra.gravity == SubtitlesDecoder.GRAVITY_AN8 || extra.gravity == SubtitlesDecoder.GRAVITY_AN9) {
+            y = top;
+        } else {
+            y = bottom;
+        }
+
+        if (extra.currentClip != null) {
+            Rect clip = clipRect(extra, area, lines.size());
+            count = canvas.save();
+            canvas.clipRect(clip);
+        }
+        if (extra.currentDegree != 0) {
+            if (count == -1) {
+                count = canvas.save();
+            }
+            float degree = -extra.currentDegree;
+            canvas.rotate(degree, x, y);
+        }
+        if (extra.currentDegreeX != 0 || extra.currentDegreeY != 0) {
+            if (count == -1) {
+                count = canvas.save();
+            }
+            float xd = (float) Math.cos(Math.toRadians(extra.currentDegreeY));
+            float yd = (float) Math.cos(Math.toRadians(extra.currentDegreeX));
+            canvas.scale(xd, yd, x, y);
+        }
+        return count;
+    }
+
+    /**
+     * 获取clip范围
+     */
+    private Rect clipRect(Style clip, Rect area, int line) {
+        if (clip == null) {
+            return null;
+        }
+        //竖屏字体放大，坐标不能完全重合，取消clip
+//        if (getWidth() * 1f / getHeight() < 1.4) {
+//            return null;
+//        }
+        SubtitlesModel.Extent in = clip.currentClip;
+//        float diff = in.left * getWidth() - in.left * area.height();
+        float diff = in.left;
+        float extraHeight = Math.max(line - 1, 0) * lineSpace;
+        return new Rect(Math.max((int) (in.left * width - diff), 0),
+                (int) (in.top * area.height() + area.top - extraHeight),
+                Math.min((int) (in.right * width + diff), width),
+                (int) (in.bottom * area.height() + area.top + extraHeight));
     }
 
     /**
@@ -545,7 +608,7 @@ public class TextRender {
             return leftSpace;
         }
         Rect area = getDrawArea(style);
-        float scale = style.playResX == 0 ? 1 : width * 1f / style.playResX;
+        float scale = style.playResX == 0 ? 1 : area.width() * 1f / style.playResX;
         return area.left + style.getMarginL() * scale;
     }
 
@@ -553,8 +616,8 @@ public class TextRender {
         if (style == null) {
             return topSpace;
         }
-        float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
         Rect area = getDrawArea(style);
+        float scale = style.playResY == 0 ? 1 : area.height() * 1f / style.playResY;
         return area.top + style.getMarginV() * scale;
     }
 
@@ -563,7 +626,7 @@ public class TextRender {
             return rightSpace;
         }
         Rect area = getDrawArea(style);
-        float scale = style.playResX == 0 ? 1 : width * 1f / style.playResX;
+        float scale = style.playResX == 0 ? 1 : area.width() * 1f / style.playResX;
         return width - area.right + style.getMarginR() * scale;
     }
 
@@ -573,7 +636,7 @@ public class TextRender {
         if (style == null || !style.hasMarginV()) {
             return height - area.bottom + (srtBottomSpace * (height / 1080f));
         }
-        float scale = style.playResY == 0 ? 1 : height * 1f / style.playResY;
+        float scale = style.playResY == 0 ? 1 : area.height() * 1f / style.playResY;
         float space = style.getMarginV() * scale;
         return height - area.bottom + space;
     }

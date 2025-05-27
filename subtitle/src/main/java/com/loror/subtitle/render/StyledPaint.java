@@ -321,6 +321,18 @@ public class StyledPaint {
             textPaint.setTextSize(saveSize);
             return height != 0 ? height : (textPaint.descent() - textPaint.ascent());
         } else {
+            if (topStyle != null && topStyle.isFontFall()) {
+                int textLength = text.length();
+                float max = 0;
+                for (int i = 0; i < textLength; i++) {
+                    char c = text.charAt(i);
+                    float measure = textPaint.measureText(String.valueOf(c));
+                    if (measure > max) {
+                        max = measure;
+                    }
+                }
+                return max;
+            }
             return textPaint.descent() - textPaint.ascent();
         }
     }
@@ -357,6 +369,9 @@ public class StyledPaint {
             textPaint.setTextSize(saveSize);
             return xEnd;
         } else {
+            if (topStyle != null && topStyle.isFontFall()) {
+                return text.length() * (textPaint.descent() - textPaint.ascent());
+            }
             return textPaint.measureText(text, start, end);
         }
     }

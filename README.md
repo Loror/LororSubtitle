@@ -8,7 +8,7 @@
 
 ```
 dependencies {
-    compile 'com.github.Loror:LororSubtitle:1.0.0'
+    compile 'com.github.Loror:LororSubtitle:1.0.0.rc'
 }
 
 allprojects {
