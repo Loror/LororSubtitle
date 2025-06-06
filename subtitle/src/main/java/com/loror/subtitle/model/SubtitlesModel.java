@@ -101,8 +101,13 @@ public class SubtitlesModel {
         return model;
     }
 
+    private List<Path> paths;
+
     public List<Path> getPaths() {
-        return SubtitlesDecoder.Extra.parsePath(this);
+        if (paths == null) {
+            paths = SubtitlesDecoder.Extra.parsePath(this);
+        }
+        return paths;
     }
 
     @Override
@@ -1103,7 +1108,7 @@ public class SubtitlesModel {
 
     public static class Path {
 
-        public String cmd;
+        public char cmd;
         public List<Point> points;
 
         @Override

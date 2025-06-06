@@ -36,14 +36,13 @@ public class StyledPaint {
     private int mode = MODE_BODY;
     private final TextPaint textPaint = new TextPaint();
     private final Paint backgroundPaint = new Paint();
-    private int minTextSize = 6;//最小字体大小（像素，对standardWidth）
+    private final Paint.FontMetrics metrics = new Paint.FontMetrics();
     private int screenWidth = 1920;
     private int screenHeight = 1080;
-    private int videoWidth = 1920;
-    private int videoHeight = 1080;
-    protected float extraFontScale = 0.9f;//二级字体大小缩放
+    private int videoWidth = 0;
+    private int videoHeight = 0;
+    private float extraFontScale;//二级字体大小缩放
     private float fontScale = 1f;//字体大小缩放
-    private int ptStandardWidth = 384;//默认pt->px转换宽度
     private int strokeScale = 2;
     private boolean roundStroke;
     private int ptWidth;
@@ -54,34 +53,38 @@ public class StyledPaint {
         textPaint.setStyle(Paint.Style.FILL);
         backgroundPaint.setAntiAlias(true);
         backgroundPaint.setStyle(Paint.Style.FILL);
+        float size = textPaint.getTextSize();
+        textPaint.setTextSize(100);
+        textPaint.getFontMetrics(metrics);
+        textPaint.setTextSize(size);
+//        float act = metrics.descent - metrics.ascent;
+        float act = metrics.bottom - metrics.top;
+        extraFontScale = 100 / act;
     }
 
     public void setMode(@Mode int mode) {
         this.mode = mode;
     }
 
-    public void setMinTextSize(int minTextSize) {
-        this.minTextSize = minTextSize;
-    }
-
+    /**
+     * 设置view宽高
+     */
     public void setScreenSize(int screenWidth, int screenHeight) {
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
     }
 
+    /**
+     * 设置视频宽高
+     */
     public void setVideoSize(int videoWidth, int videoHeight) {
         this.videoWidth = videoWidth;
         this.videoHeight = videoHeight;
     }
 
-    public int getWidth() {
-        return screenWidth;
-    }
-
-    public int getHeight() {
-        return screenHeight;
-    }
-
+    /**
+     * 设置字幕定义宽高
+     */
     public void setPtSize(int ptWidth, int ptHeight) {
         this.ptWidth = ptWidth;
         this.ptHeight = ptHeight;
@@ -111,15 +114,19 @@ public class StyledPaint {
     }
 
     public float getPaintHeight() {
-        return textPaint.descent() - textPaint.ascent();
+        return descent() - ascent();
     }
 
     public float descent() {
-        return textPaint.descent();
+//        return textPaint.descent();
+        textPaint.getFontMetrics(metrics);
+        return metrics.bottom;
     }
 
     public float ascent() {
-        return textPaint.ascent();
+//        return textPaint.ascent();
+        textPaint.getFontMetrics(metrics);
+        return metrics.top;
     }
 
     public float getTextSize() {
@@ -144,8 +151,7 @@ public class StyledPaint {
             float scale = height * 1f / ptHeight;
             return pt * scale * fontScale * extraFontScale;
         }
-        float standardHeight = ptStandardWidth / 1.33f;
-        float scale = height * 1f / standardHeight;
+        float scale = height * 1f / 288;//字幕默认定义384*288
         return pt * scale * fontScale * extraFontScale;
     }
 
@@ -186,7 +192,7 @@ public class StyledPaint {
                 textPaint.setTypeface(Typeface.DEFAULT);
             }
             if (extra.hasFontSize()) {
-                float size = pt2Px(Math.max(extra.getFontSize(), minTextSize));
+                float size = pt2Px(extra.getFontSize());
                 textPaint.setTextSize(size);
             } else {
                 float size = pt2Px(getDefaultFontSize());
@@ -221,7 +227,7 @@ public class StyledPaint {
                     shadowWidth = shadowWidth * screenWidth / ptWidth;
                     borderWidth = borderWidth * screenWidth / ptWidth;
                 }
-            } else {
+            } else if (videoWidth != 0) {
                 shadowWidth = shadowWidth * screenWidth / videoWidth;
                 borderWidth = borderWidth * screenWidth / videoWidth;
             }
@@ -292,7 +298,7 @@ public class StyledPaint {
      */
     public float measureHeight(CharSequence text, Style topStyle) {
         if (TextUtils.isEmpty(text)) {
-            return textPaint.descent() - textPaint.ascent();
+            return descent() - ascent();
         }
         setMode(MODE_MEASURE);
         setPaint(topStyle);
@@ -314,12 +320,12 @@ public class StyledPaint {
                         style.scaleBS = scaleBS;
                         setMode(MODE_MEASURE);
                         setPaint(style);
-                        height = Math.max(height, textPaint.descent() - textPaint.ascent());
+                        height = Math.max(height, descent() - ascent());
                     }
                 }
             }
             textPaint.setTextSize(saveSize);
-            return height != 0 ? height : (textPaint.descent() - textPaint.ascent());
+            return height != 0 ? height : (descent() - ascent());
         } else {
             if (topStyle != null && topStyle.isFontFall()) {
                 int textLength = text.length();
@@ -333,7 +339,7 @@ public class StyledPaint {
                 }
                 return max;
             }
-            return textPaint.descent() - textPaint.ascent();
+            return descent() - ascent();
         }
     }
 
@@ -370,7 +376,7 @@ public class StyledPaint {
             return xEnd;
         } else {
             if (topStyle != null && topStyle.isFontFall()) {
-                return text.length() * (textPaint.descent() - textPaint.ascent());
+                return text.length() * (descent() - ascent());
             }
             return textPaint.measureText(text, start, end);
         }
@@ -387,7 +393,7 @@ public class StyledPaint {
         int start = 0;
         int end = text.length();
         if (start >= text.length()) {
-            return textPaint.descent() - textPaint.ascent();
+            return descent() - ascent();
         }
         setMode(MODE_MEASURE);
         setPaint(topStyle);
@@ -418,7 +424,7 @@ public class StyledPaint {
                         setPaint(style);
                     }
                 }
-                height = Math.max(height, textPaint.descent() - textPaint.ascent());
+                height = Math.max(height, descent() - ascent());
                 float textWidth = textPaint.measureText(spanned, i, next);
                 drawText(canvas, spanned, i, next, xStart + x, y, textWidth, current, fgSpans.length > 0 ? fgSpans[0] : null);
                 xEnd = xStart + textWidth + (textPaint.getLetterSpacing() * textPaint.getTextSize());
@@ -427,7 +433,7 @@ public class StyledPaint {
         } else {
             //倾倒文字
             if (topStyle != null && topStyle.isFontFall()) {
-                float measureHeight = textPaint.descent() - textPaint.ascent();
+                float measureHeight = descent() - ascent();
                 int textLength = text.length();
                 float[] measures = new float[textLength];
                 float max = 0;
@@ -453,7 +459,7 @@ public class StyledPaint {
                 drawText(canvas, text, start, end, x, y, textWidth, current, null);
             }
         }
-        return height != 0 ? height : (textPaint.descent() - textPaint.ascent());
+        return height != 0 ? height : (descent() - ascent());
     }
 
     /**
@@ -504,7 +510,7 @@ public class StyledPaint {
                 if (alpha > 5) {
                     if (drawCount > 0) {
                         //内边框需要裁剪,阴影不需要裁剪
-                        layer = canvas.saveLayer(x - strokeWidth, y + textPaint.ascent() - strokeWidth, x + textWidth + strokeWidth, y + textPaint.descent() + strokeWidth, textPaint);
+                        layer = canvas.saveLayer(x - strokeWidth, y + ascent() - strokeWidth, x + textWidth + strokeWidth, y + descent() + strokeWidth, textPaint);
                         saveLayer = true;
                     }
 //                if (drawCount > 0 && !isBe) {
@@ -521,7 +527,7 @@ public class StyledPaint {
             this.setMode(StyledPaint.MODE_BORD);
             this.setPaint(style);
             backgroundPaint.setColor(textPaint.getColor());
-            canvas.drawRect(x, y + textPaint.ascent(), x + measureText(text, start, end, style), y + textPaint.descent(), backgroundPaint);
+            canvas.drawRect(x, y + ascent(), x + measureText(text, start, end, style), y + descent(), backgroundPaint);
         }
         this.setMode(StyledPaint.MODE_BODY);
         this.setPaint(style);

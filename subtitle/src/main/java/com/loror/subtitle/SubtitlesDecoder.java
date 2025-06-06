@@ -83,7 +83,6 @@ public class SubtitlesDecoder {
     private final Map<String, Style> styles = new HashMap<>();
     private final List<String> subFormat = new ArrayList<>();
     private final AssInfo assInfo = new AssInfo();
-    private boolean ignorePath = true;//是否忽略绘画标签
 
     public static class AssInfo {
         public int delay = 0;//整体延时
@@ -131,13 +130,6 @@ public class SubtitlesDecoder {
      */
     public Map<String, Style> getStyles() {
         return styles;
-    }
-
-    /**
-     * 是否忽略绘画标签
-     */
-    public void setIgnorePath(boolean ignorePath) {
-        this.ignorePath = ignorePath;
     }
 
     /**
@@ -197,9 +189,14 @@ public class SubtitlesDecoder {
             if (line == null) {
                 return null;
             }
-            //ass字幕开始
+            //ass字幕开始 文件开始可能包含BOM，使用contains判断
             if (line.contains(ASS_HEAD)) {
                 mode = 1;
+                assInfo.playResX = 384;
+                assInfo.playResY = 288;
+            } else if (line.contains(ASS_HEAD_STYLE) || line.contains(ASS_HEAD_STYLE_1) || line.contains(ASS_HEAD_STYLE_2)) {
+                mode = 1;
+                block = 1;
                 assInfo.playResX = 384;
                 assInfo.playResY = 288;
             }
@@ -273,9 +270,6 @@ public class SubtitlesDecoder {
                                 subFormat.add(s.trim());
                             }
                         } else if (line.startsWith(ASS_START)) {
-                            if (ignorePath && line.contains("{\\p0}")) {
-                                continue;
-                            }
                             try {
                                 line = line.substring(ASS_START.length());
                                 //ass字幕字幕内容默认在第9个逗号之后
@@ -1176,6 +1170,18 @@ public class SubtitlesDecoder {
                 result.setShadowAlpha(a4);
                 return true;
             }
+            //\alpha&H9F& \alpha&AA
+            String a = find(mark, "\\alpha&", '&');
+            if (a != null && (a.length() == 2 || a.length() == 3)) {
+                if (a.length() == 3) {
+                    a = a.substring(1);
+                }
+                result.setFontAlpha(a);
+                result.setFontSecondaryAlpha(a);
+                result.setBorderAlpha(a);
+                result.setShadowAlpha(a);
+                return true;
+            }
             return false;
         }
 
@@ -1413,85 +1419,97 @@ public class SubtitlesDecoder {
             }
             String vector = model.content.toString();
             if (vector.startsWith("m")) {
-                int end = vector.indexOf("{");
-                List<SubtitlesModel.Path> paths = new ArrayList<>();
-                String[] marks = (end == -1 ? vector : vector.substring(0, end)).split("&nbsp;");
-                String cmd = "";
+                char cmd = '0';
+                StringBuilder number = new StringBuilder();
                 List<Float> points = new ArrayList<>();
-                for (String mark : marks) {
-                    if ("m".equals(mark) || "n".equals(mark) ||
-                            "l".equals(mark) || "b".equals(mark) || "s".equals(mark) ||
-                            "p".equals(mark) || "c".equals(mark)) {
-                        if (!TextUtils.isEmpty(cmd)) {
-                            addPoint(paths, cmd, points);
-                        }
-                        cmd = mark;
-                        points.clear();
+                List<SubtitlesModel.Path> paths = new ArrayList<>();
+                for (int i = 0; i < vector.length(); i++) {
+                    char c = vector.charAt(i);
+                    switch (c) {
+                        case 'm':
+                        case 'n':
+                        case 'l':
+                        case 'b':
+                        case 's':
+                        case 'p':
+                        case 'c':
+                            if (cmd != '0') {
+                                addPoint(paths, cmd, points);
+                            }
+                            cmd = c;
+                            number = new StringBuilder();
+                            points.clear();
+                            continue;
+                    }
+                    if ((c >= '0' && c <= '9') || c == '.') {
+                        number.append(c);
                     } else {
-                        try {
-                            points.add(Float.parseFloat(mark));
-                        } catch (NumberFormatException e) {
-                            e.printStackTrace();
-                            return null;
+                        if (number.length() > 0) {
+                            points.add(Float.parseFloat(number.toString()));
+                            number = new StringBuilder();
                         }
                     }
                 }
-                if (!points.isEmpty()) {
-                    try {
-                        addPoint(paths, cmd, points);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                if (cmd != '0' && !points.isEmpty()) {
+                    addPoint(paths, cmd, points);
                 }
                 return paths;
             }
             return null;
         }
 
-        private static void addPoint(List<SubtitlesModel.Path> paths, String cmd, List<Float> points) {
-            if (points.size() % 2 != 0) {
+        private static void addPoint(List<SubtitlesModel.Path> paths, char cmd, List<Float> points) {
+            if (points.isEmpty() || points.size() % 2 != 0) {
                 return;
             }
-            if ("l".equals(cmd) || "p".equals(cmd)) {
-                for (int i = 0; i < points.size(); i++) {
-                    SubtitlesModel.Point point = new SubtitlesModel.Point();
-                    point.x = points.get(i);
-                    point.y = points.get(i + 1);
-                    i++;
+            switch (cmd) {
+                case 'l':
+                case 'p': {
+                    for (int i = 0; i < points.size(); i++) {
+                        SubtitlesModel.Point point = new SubtitlesModel.Point();
+                        point.x = points.get(i);
+                        point.y = points.get(i + 1);
+                        i++;
+                        SubtitlesModel.Path path = new SubtitlesModel.Path();
+                        path.cmd = cmd;
+                        path.points = new ArrayList<>();
+                        path.points.add(point);
+                        paths.add(path);
+                    }
+                }
+                break;
+                case 'b': {
+                    List<SubtitlesModel.Point> ps = new ArrayList<>();
+                    for (int i = 0; i < points.size(); i++) {
+                        SubtitlesModel.Point point = new SubtitlesModel.Point();
+                        point.x = points.get(i);
+                        point.y = points.get(i + 1);
+                        ps.add(point);
+                        i++;
+                        if (ps.size() == 3) {
+                            SubtitlesModel.Path path = new SubtitlesModel.Path();
+                            path.cmd = cmd;
+                            path.points = new ArrayList<>(ps);
+                            paths.add(path);
+                            ps.clear();
+                        }
+                    }
+                }
+                break;
+                default: {
                     SubtitlesModel.Path path = new SubtitlesModel.Path();
                     path.cmd = cmd;
                     path.points = new ArrayList<>();
-                    path.points.add(point);
+                    for (int i = 0; i < points.size(); i++) {
+                        SubtitlesModel.Point point = new SubtitlesModel.Point();
+                        point.x = points.get(i);
+                        point.y = points.get(i + 1);
+                        path.points.add(point);
+                        i++;
+                    }
                     paths.add(path);
                 }
-            } else if ("b".equals(cmd)) {
-                List<SubtitlesModel.Point> ps = new ArrayList<>();
-                for (int i = 0; i < points.size(); i++) {
-                    SubtitlesModel.Point point = new SubtitlesModel.Point();
-                    point.x = points.get(i);
-                    point.y = points.get(i + 1);
-                    ps.add(point);
-                    i++;
-                    if (ps.size() == 3) {
-                        SubtitlesModel.Path path = new SubtitlesModel.Path();
-                        path.cmd = cmd;
-                        path.points = new ArrayList<>(ps);
-                        paths.add(path);
-                        ps.clear();
-                    }
-                }
-            } else {
-                SubtitlesModel.Path path = new SubtitlesModel.Path();
-                path.cmd = cmd;
-                path.points = new ArrayList<>();
-                for (int i = 0; i < points.size(); i++) {
-                    SubtitlesModel.Point point = new SubtitlesModel.Point();
-                    point.x = points.get(i);
-                    point.y = points.get(i + 1);
-                    path.points.add(point);
-                    i++;
-                }
-                paths.add(path);
+                break;
             }
         }
     }

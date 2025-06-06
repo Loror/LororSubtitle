@@ -35,16 +35,14 @@ public class TextRender {
     private final int lineSplit = 2;//空白行占位比例
     private final int lineSpace;//行间距
     private boolean drawSimpleTextBySystem = true;//是否使用系统方式（TextView）绘制简单文本
-    private boolean yieldPosition;//绘制绝对坐标字幕是否避让边界
-    private int leftSpace;//左部字幕避让位置
-    private int topSpace;//顶部字幕避让位置
-    private int rightSpace;//右部字幕避让位置
-    private int bottomSpace;//底部字幕避让位置
-    private float aspectRatio = 16f / 9;//视频宽高比
-    private boolean aspectRatioSet;//视频宽高比是否设置
-    private boolean notRenderBeforeAspectRatioSet;//视频比例设置前不渲染
-    private float srtBottomSpace = 60;//设置入幕srt底部距离
+    private int leftSpace;//默认左部字幕避让位置
+    private int topSpace;//默认顶部字幕避让位置
+    private int rightSpace;//默认右部字幕避让位置
+    private int bottomSpace;//默认底部字幕避让位置
+    private float aspectRatio = 0;//视频宽高比
+    private float srtBottomSpace = 60;//设置默认入幕srt底部距离
     private int width, height;//绘制宽高
+    private boolean drawPath;//绘制path
 
     public TextRender(int lineSpace) {
         this.lineSpace = lineSpace;
@@ -88,18 +86,18 @@ public class TextRender {
      * 绘制字幕
      */
     public void render(@NonNull Canvas canvas) {
-        if (notRenderBeforeAspectRatioSet && !aspectRatioSet) {
-            return;
-        }
         Rect r = canvas.getClipBounds();
         this.width = r.width();
         this.height = r.height();
-        if (!aspectRatioSet && this.height != 0) {
-            aspectRatio = this.width * 1f / this.height;
+        if (aspectRatio == 0) {
+            if (this.height != 0) {
+                aspectRatio = this.width * 1f / this.height;
+            } else {
+                return;
+            }
         }
         Rect area = getDrawArea(null);
         styledPaint.setScreenSize(area.width(), area.height());
-        vectorPaint.setScreenSize(area.width(), area.height());
         drawText(canvas);
     }
 
@@ -127,7 +125,7 @@ public class TextRender {
                     CharSequence text = lines.get(i);
                     float measureWidth = styledPaint.getTextPaint().measureText(text, 0, text.length());
                     float x = (width - measureWidth) / 2;
-                    float y = height - styledPaint.getTextPaint().descent() - ((lines.size() - 1 - i) * measureHeight);
+                    float y = height - styledPaint.descent() - ((lines.size() - 1 - i) * measureHeight);
                     y -= i * lineSpace;
                     styledPaint.drawText(canvas, text, x, y, null);
                 }
@@ -210,10 +208,6 @@ public class TextRender {
             SubtitlesModel subtitlesModel = subtitlesModels.get(j);
             Style extra = subtitlesModel.style;
             if (extra != null) {
-                if (extra.isPath) {
-//                    vectorPaint.drawVector(subtitlesModel, canvas);
-                    continue;
-                }
                 float savedFontScale = extra.currentFontScale;
                 Rect area = getDrawArea(extra);
                 if (extra.currentClip != null) {
@@ -226,6 +220,13 @@ public class TextRender {
                     //竖屏全屏宽高改变，计算异常
 //                  extra.currentFontScale = extra.currentFontScale * Math.min(1f, (width * 1f / height) / aspectRatio);
                 }
+                if (extra.isPath) {
+                    if (drawPath) {
+                        vectorPaint.setArea(area);
+                        vectorPaint.drawVector(subtitlesModel, canvas);
+                    }
+                    continue;
+                }
                 styledPaint.setMode(StyledPaint.MODE_BODY);
                 styledPaint.setPaint(extra);
                 float x = extra.x * area.width() + area.left;
@@ -233,18 +234,6 @@ public class TextRender {
                 List<CharSequence> lines = styledLayout.pageLines(subtitlesModel.text(), styledPaint, extra, width, 1);
                 float y = extra.y * area.height() + area.top;
                 float totalHeight = measureHeight(lines, extra);
-                if (lines.size() > 1) {
-                    //所需绘制文字总高超过屏幕，缩放到屏幕能容纳
-                    if (yieldPosition && totalHeight > height) {
-                        float saveExtraFontScale = styledPaint.extraFontScale;
-                        float needMeasureHeight = totalHeight;
-                        styledPaint.extraFontScale = saveExtraFontScale * (height / needMeasureHeight);
-                        styledPaint.setMode(StyledPaint.MODE_BODY);
-                        styledPaint.setPaint(extra);
-                        styledPaint.extraFontScale = saveExtraFontScale;
-                        totalHeight = measureHeight(lines, extra);
-                    }
-                }
                 //字幕行的行对齐方式决定了位置设定的参考点。
                 //举例来说，当行对齐设定为左上时，字幕行的左上角会被放置在 \pos 指定的位置，对于底部中间对齐来说，字幕的底部中间位置将会被放置在指定的坐标上。
                 float offsetY;
@@ -650,7 +639,7 @@ public class TextRender {
         rect.top = 0;
         rect.left = 0;
         //默认根据视频宽高确定区域
-        if (aspectRatioSet) {
+        if (aspectRatio != 0) {
             //实际显示宽屏，宽需要重定
             if (width * 1f / height > aspectRatio) {
                 rect.bottom = height;
@@ -721,10 +710,6 @@ public class TextRender {
         styledPaint.setFontScale(scale);
     }
 
-    public void setYieldPosition(boolean yieldPosition) {
-        this.yieldPosition = yieldPosition;
-    }
-
     /**
      * 设置左部字幕避让位置
      */
@@ -768,23 +753,8 @@ public class TextRender {
      */
     public void setAspectRatio(int videoWidth, int videoHeight) {
         this.aspectRatio = videoWidth * 1f / videoHeight;
-        this.aspectRatioSet = true;
         this.styledPaint.setVideoSize(videoWidth, videoHeight);
-    }
-
-    /**
-     * 重置视频宽高比
-     */
-    public void resetAspectRatio() {
-        this.aspectRatio = 16f / 9;
-        this.aspectRatioSet = false;
-    }
-
-    /**
-     * 视频比例设置前不渲染
-     */
-    public void setNotRenderBeforeAspectRatioSet(boolean notRenderBeforeAspectRatioSet) {
-        this.notRenderBeforeAspectRatioSet = notRenderBeforeAspectRatioSet;
+        this.vectorPaint.setVideoSize(videoWidth, videoHeight);
     }
 
     /**
@@ -806,6 +776,13 @@ public class TextRender {
      */
     public void setRoundStroke(boolean roundStroke) {
         this.styledPaint.setRoundStroke(roundStroke);
+    }
+
+    /**
+     * 设置绘制path
+     */
+    public void setDrawPath(boolean drawPath) {
+        this.drawPath = drawPath;
     }
 
     /**
