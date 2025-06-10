@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License%20-Apache%202-337ab7.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-## 支持srt、ass/ssa大部分标签渲染
+## 支持srt、ass/ssa大部分常用标签渲染
 
 ## Studio中引入项目
 

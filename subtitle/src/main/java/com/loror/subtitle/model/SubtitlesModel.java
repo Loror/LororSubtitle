@@ -132,7 +132,7 @@ public class SubtitlesModel {
         public int playResY;//字幕标定屏幕大小
         public int gravity;//9宫格位置
         private String font;//字体
-        private boolean fontFall;//字体向左倾倒
+        private Boolean fontFall;//字体向左倾倒
         /**
          * ass的字体的fontsize的单位是pt（磅）
          * 1px（像素）=(72/dpi)*pt
@@ -238,7 +238,9 @@ public class SubtitlesModel {
             if (value.font != null) {
                 this.font = value.font;
             }
-            this.fontFall = value.fontFall;
+            if (value.fontFall != null) {
+                this.fontFall = value.fontFall;
+            }
             if (value.fontSize != null) {
                 this.fontSize = value.fontSize;
             }
@@ -383,7 +385,7 @@ public class SubtitlesModel {
         }
 
         public boolean isFontFall() {
-            return fontFall;
+            return fontFall != null && fontFall;
         }
 
         public int getFontSize() {
@@ -1064,6 +1066,7 @@ public class SubtitlesModel {
             return "SubtitlesStyle{" +
                     "gravity=" + gravity +
                     ", font='" + font + '\'' +
+                    ", fontFall=" + fontFall +
                     ", fontSize=" + fontSize +
                     ", fontAlpha=" + (fontAlpha == null ? null : Integer.toHexString(fontAlpha)) +
                     ", fontColor=" + (fontColor == null ? null : Integer.toHexString(fontColor)) +

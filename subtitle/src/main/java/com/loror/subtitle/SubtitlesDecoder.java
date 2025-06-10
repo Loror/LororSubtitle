@@ -724,12 +724,12 @@ public class SubtitlesDecoder {
                 }
                 if (index != -1) {
                     String extra = text.substring(0, index + 1);
-                    String data = filterString(text.substring(index + 1));
-                    String color = findColor(data);
-                    if (color != null) {
-                        data = Html.fromHtml(data.replace("\n", "<br/>")
-                                        .replace(" ", "&nbsp;"))
-                                .toString();
+                    CharSequence data = filterString(text.substring(index + 1));
+//                    String color = findColor(data);
+                    if (findHtml(data.toString())) {
+                        data = Html.fromHtml(data.toString().replace("\n", "<br/>")
+                                .replace(" ", "&nbsp;"));
+                        hasSpan = true;
                     }
                     if (TextUtils.isEmpty(result)) {
                         content.extra += extra;
@@ -770,17 +770,17 @@ public class SubtitlesDecoder {
                         } else {
                             style.extendStyle(mine);
                         }
-                        if (!TextUtils.isEmpty(color)) {
-                            if (style == null) {
-                                style = new Style();
-                            }
-                            try {
-                                style.setFontColor(SubColorUtil.parseArgb(color));
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                System.err.println("SubtitlesView parse c failed:" + color);
-                            }
-                        }
+//                        if (!TextUtils.isEmpty(color)) {
+//                            if (style == null) {
+//                                style = new Style();
+//                            }
+//                            try {
+//                                style.setFontColor(SubColorUtil.parseArgb(color));
+//                            } catch (Exception e) {
+//                                e.printStackTrace();
+//                                System.err.println("SubtitlesView parse c failed:" + color);
+//                            }
+//                        }
                         if (style == null) {
                             result.append(data);
                         } else {
@@ -799,8 +799,8 @@ public class SubtitlesDecoder {
                 }
             }
             CharSequence data = filterString(text);
-            String color = findColor(data.toString());
-            if (color != null) {
+//            String color = findColor(data.toString());
+            if (findHtml(data.toString())) {
                 data = Html.fromHtml(data.toString().replace("\n", "<br/>")
                         .replace(" ", "&nbsp;"));
                 hasSpan = true;
@@ -954,6 +954,21 @@ public class SubtitlesDecoder {
             return color;
         }
         return null;
+    }
+
+    private static boolean findHtml(String text) {
+        boolean started = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '<') {
+                started = true;
+            } else if (started) {
+                if (c == '>' || c == '/') {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String filterString(String text) {

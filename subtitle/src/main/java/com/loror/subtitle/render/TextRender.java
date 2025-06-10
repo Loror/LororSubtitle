@@ -42,6 +42,7 @@ public class TextRender {
     private float aspectRatio = 0;//视频宽高比
     private float srtBottomSpace = 60;//设置默认入幕srt底部距离
     private int width, height;//绘制宽高
+    private float fontScale = 1f;
     private boolean drawPath;//绘制path
 
     public TextRender(int lineSpace) {
@@ -109,6 +110,7 @@ public class TextRender {
      */
     private void drawText(@NonNull Canvas canvas) {
         if (simpleText != null) {
+            styledPaint.setFontScale(fontScale);
             if (drawSimpleTextBySystem && simpleText instanceof Spanned) {
                 styledPaint.getTextPaint().setColor(Color.WHITE);
                 styledPaint.getTextPaint().setTextSize(styledPaint.pt2Px(styledPaint.getDefaultFontSize()));
@@ -130,6 +132,7 @@ public class TextRender {
                     styledPaint.drawText(canvas, text, x, y, null);
                 }
             }
+            styledPaint.setFontScale(1f);
             return;
         }
         if (showModels.isEmpty()) {
@@ -142,6 +145,7 @@ public class TextRender {
             }
         }
 
+        styledPaint.setFontScale(fontScale);
         RenderedModel an1 = showModels.get(SubtitlesDecoder.GRAVITY_AN1);
         if (an1 != null) {
             for (List<SubtitlesModel> model : an1.getModels()) {
@@ -160,6 +164,7 @@ public class TextRender {
                 drawBottom(model, canvas, Gravity.RIGHT);
             }
         }
+        styledPaint.setFontScale(1f);
 
         RenderedModel an4 = showModels.get(SubtitlesDecoder.GRAVITY_AN4);
         if (an4 != null) {
@@ -704,10 +709,10 @@ public class TextRender {
     }
 
     /**
-     * 设置字体缩放
+     * 设置字体缩放，仅对底部字幕生效
      */
     public void setFontScale(float scale) {
-        styledPaint.setFontScale(scale);
+        this.fontScale = scale;
     }
 
     /**

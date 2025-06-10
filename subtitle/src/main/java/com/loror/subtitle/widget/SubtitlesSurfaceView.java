@@ -102,6 +102,17 @@ public class SubtitlesSurfaceView extends SurfaceView implements SurfaceHolder.C
         currentRender = null;
     }
 
+    public void update() {
+        if (mSurface == null) {
+            return;
+        }
+        SubtitlesRender render = currentRender;
+        if (render != null) {
+            currentRender = null;
+            showModels(render);
+        }
+    }
+
     /**
      * 显示一组字幕
      */

@@ -3,8 +3,10 @@ package com.loror.subtitle.render;
 import android.graphics.Rect;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.SpannedString;
 import android.text.TextUtils;
+import android.text.style.CharacterStyle;
 import android.text.style.ForegroundColorSpan;
 
 import androidx.annotation.Nullable;
@@ -15,7 +17,6 @@ import com.loror.subtitle.model.SubtitlesAnimation;
 import com.loror.subtitle.model.SubtitlesModel;
 import com.loror.subtitle.util.SubtitlesUtil;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -157,7 +158,9 @@ public class SubtitlesRender {
                     gravity = SubtitlesDecoder.GRAVITY_UNSET;
                 }
                 renderAnimation(sub, extra);
+                renderChildStyle(sub, extra);
             }
+
             RenderedModel item = showModels.get(gravity);
             if (item == null) {
                 item = new RenderedModel(gravity);
@@ -171,6 +174,36 @@ public class SubtitlesRender {
             model.sort();
         }
         return showModels;
+    }
+
+    //渲染子style
+    private void renderChildStyle(SubtitlesModel sub, Style extra) {
+        if (extra == null) {
+            return;
+        }
+        CharSequence text = sub.text();
+        if (text instanceof Spanned) {
+            Spanned spanned = (Spanned) text;
+            int start = 0;
+            int next;
+            for (int i = start; i < spanned.length(); i = next) {
+                next = spanned.nextSpanTransition(i, spanned.length(), CharacterStyle.class);
+                StyledSpan[] spans = spanned.getSpans(i, next, StyledSpan.class);
+                if (spans != null && spans.length > 0) {
+                    StyledSpan styledSpan = spans[0];
+                    Style style = styledSpan.getStyle();
+                    if (style != null) {
+                        style.useSecond = extra.useSecond;
+                        style.scaleBS = extra.scaleBS;
+                        if (!style.hasBlur() || Objects.equals(style.getBlur(), extra.getBlur())) {
+                            style.currentBlur = extra.currentBlur;
+                        }
+                        style.alpha = extra.alpha;
+                        style.currentFontScale = extra.currentFontScale;
+                    }
+                }
+            }
+        }
     }
 
     private void renderAnimation(SubtitlesModel sub, Style extra) {

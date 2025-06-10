@@ -13,6 +13,9 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.style.CharacterStyle;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.StrikethroughSpan;
+import android.text.style.StyleSpan;
+import android.text.style.UnderlineSpan;
 
 import androidx.annotation.IntDef;
 
@@ -47,6 +50,7 @@ public class StyledPaint {
     private boolean roundStroke;
     private int ptWidth;
     private int ptHeight;
+    private boolean eachFallMode;//单字旋转
 
     public StyledPaint() {
         textPaint.setAntiAlias(true);
@@ -90,8 +94,18 @@ public class StyledPaint {
         this.ptHeight = ptHeight;
     }
 
+    /**
+     * 设置字体大小缩放
+     */
     public void setFontScale(float fontScale) {
         this.fontScale = fontScale;
+    }
+
+    /**
+     * 设置单字旋转模式
+     */
+    public void setEachFallMode(boolean eachFallMode) {
+        this.eachFallMode = eachFallMode;
     }
 
     public float getDefaultFontSize() {
@@ -302,8 +316,6 @@ public class StyledPaint {
         }
         setMode(MODE_MEASURE);
         setPaint(topStyle);
-        float fontScale = topStyle == null ? 1f : topStyle.currentFontScale;
-        boolean scaleBS = topStyle != null && topStyle.scaleBS;
         if (text instanceof Spanned) {
             float height = 0;
             Spanned spanned = (Spanned) text;
@@ -316,8 +328,6 @@ public class StyledPaint {
                     StyledSpan styledSpan = spans[0];
                     Style style = styledSpan.getStyle();
                     if (style != null) {
-                        style.currentFontScale = fontScale;
-                        style.scaleBS = scaleBS;
                         setMode(MODE_MEASURE);
                         setPaint(style);
                         height = Math.max(height, descent() - ascent());
@@ -328,19 +338,23 @@ public class StyledPaint {
             return height != 0 ? height : (descent() - ascent());
         } else {
             if (topStyle != null && topStyle.isFontFall()) {
-                int textLength = text.length();
-                float max = 0;
-                for (int i = 0; i < textLength; i++) {
-                    char c = text.charAt(i);
-                    float measure = textPaint.measureText(String.valueOf(c));
-                    if (measure > max) {
-                        max = measure;
-                    }
-                }
-                return max;
+                return measureFallHeight(text, topStyle);
             }
             return descent() - ascent();
         }
+    }
+
+    private float measureFallHeight(CharSequence text, Style topStyle) {
+        int textLength = text.length();
+        float max = 0;
+        for (int i = 0; i < textLength; i++) {
+            char c = text.charAt(i);
+            float measure = textPaint.measureText(String.valueOf(c));
+            if (measure > max) {
+                max = measure;
+            }
+        }
+        return max;
     }
 
     /**
@@ -348,8 +362,6 @@ public class StyledPaint {
      */
     public float measureText(CharSequence text, int start, int end, Style topStyle) {
         //render渲染字体动画在顶部style中
-        float fontScale = topStyle == null ? 1f : topStyle.currentFontScale;
-        boolean scaleBS = topStyle != null && topStyle.scaleBS;
         setMode(MODE_MEASURE);
         setPaint(topStyle);
         if (text instanceof Spanned) {
@@ -364,8 +376,6 @@ public class StyledPaint {
                 if (spans.length > 0) {
                     StyledSpan styledSpan = spans[0];
                     Style style = styledSpan.getStyle();
-                    style.currentFontScale = fontScale;
-                    style.scaleBS = scaleBS;
                     setMode(MODE_MEASURE);
                     setPaint(style);
                 }
@@ -397,8 +407,6 @@ public class StyledPaint {
         }
         setMode(MODE_MEASURE);
         setPaint(topStyle);
-        float alpha = topStyle == null ? 1f : topStyle.alpha;
-        float fontScale = topStyle == null ? 1f : topStyle.currentFontScale;
         Style current = topStyle;
         if (text instanceof Spanned) {
             Spanned spanned = (Spanned) text;
@@ -407,53 +415,32 @@ public class StyledPaint {
             float xEnd;
             for (int i = start; i < Math.min(spanned.length(), end); i = next) {
                 next = spanned.nextSpanTransition(i, spanned.length(), CharacterStyle.class);
-                ForegroundColorSpan[] fgSpans = spanned.getSpans(i, next, ForegroundColorSpan.class);
                 StyledSpan[] spans = spanned.getSpans(i, next, StyledSpan.class);
+                CharacterStyle[] characterStyles = spanned.getSpans(i, next, CharacterStyle.class);
                 if (spans.length > 0) {
                     StyledSpan styledSpan = spans[0];
                     Style style = styledSpan.getStyle();
                     if (style != null) {
-                        if (topStyle != null) {
-                            style.useSecond = topStyle.useSecond;
-                            style.scaleBS = topStyle.scaleBS;
-                        }
-                        style.alpha = alpha;
-                        style.currentFontScale = fontScale;
                         current = style;
                         setMode(MODE_MEASURE);
                         setPaint(style);
                     }
                 }
                 height = Math.max(height, descent() - ascent());
-                float textWidth = textPaint.measureText(spanned, i, next);
-                drawText(canvas, spanned, i, next, xStart + x, y, textWidth, current, fgSpans.length > 0 ? fgSpans[0] : null);
-                xEnd = xStart + textWidth + (textPaint.getLetterSpacing() * textPaint.getTextSize());
-                xStart = xEnd;
+                if (current != null && current.isFontFall()) {
+                    float textWidth = drawFallText(canvas, text.subSequence(i, next), xStart + x, y, current, characterStyles);
+                    xEnd = xStart + textWidth + (textPaint.getLetterSpacing() * textPaint.getTextSize());
+                    xStart = xEnd;
+                } else {
+                    float textWidth = textPaint.measureText(spanned, i, next);
+                    drawText(canvas, spanned, i, next, xStart + x, y, textWidth, current, characterStyles);
+                    xEnd = xStart + textWidth + (textPaint.getLetterSpacing() * textPaint.getTextSize());
+                    xStart = xEnd;
+                }
             }
         } else {
-            //倾倒文字
             if (topStyle != null && topStyle.isFontFall()) {
-                float measureHeight = descent() - ascent();
-                int textLength = text.length();
-                float[] measures = new float[textLength];
-                float max = 0;
-                for (int i = 0; i < textLength; i++) {
-                    char c = text.charAt(i);
-                    measures[i] = textPaint.measureText(String.valueOf(c));
-                    if (measures[i] > max) {
-                        max = measures[i];
-                    }
-                }
-                float px = x + (measureHeight * textLength / 2f);
-                float py = y - max / 2;
-                int count = canvas.save();
-                canvas.rotate(-90, px, py);
-                for (int i = 0; i < textLength; i++) {
-                    char c = text.charAt(i);
-                    drawText(canvas, String.valueOf(c), 0, 1, px - measures[i] / 2f, py + (i + 1 - (textLength / 2f)) * measureHeight, measureHeight, current, null);
-//                    canvas.drawText(String.valueOf(c), px - measures[i] / 2f, py + (i + 1 - (textLength / 2f)) * measureHeight, paint);
-                }
-                canvas.restoreToCount(count);
+                drawFallText(canvas, text, x, y, topStyle, null);
             } else {
                 float textWidth = textPaint.measureText(text, start, end);
                 drawText(canvas, text, start, end, x, y, textWidth, current, null);
@@ -463,9 +450,64 @@ public class StyledPaint {
     }
 
     /**
+     * 绘制倾倒字体
+     */
+    private float drawFallText(Canvas canvas, CharSequence text, float x, float y, Style style, CharacterStyle[] characterStyles) {
+        float width;
+        if (eachFallMode) {
+            float textWidth = textPaint.measureText(text, 0, text.length());
+            float xi = x;
+            float hi = descent() - ascent();
+            for (int i = 0; i < text.length(); i++) {
+                int count = canvas.save();
+                float wi = textPaint.measureText(text, 0, 1);
+                canvas.rotate(-90, xi + wi / 2, y + descent() - hi / 2);
+                drawText(canvas, text, i, i + 1, xi, y, wi, style, characterStyles);
+                canvas.restoreToCount(count);
+                xi += wi;
+            }
+            width = textWidth - (textPaint.getLetterSpacing() * textPaint.getTextSize());
+        } else {
+            //倾倒文字，缩小大小范围
+            float measureHeight = textPaint.descent() - textPaint.ascent();
+            int textLength = text.length();
+            float[] measures = new float[textLength];
+            float max = 0;
+            for (int i = 0; i < textLength; i++) {
+                char c = text.charAt(i);
+                measures[i] = textPaint.measureText(String.valueOf(c));
+                if (measures[i] > max) {
+                    max = measures[i];
+                }
+            }
+            float descent = descent();
+            y += descent;
+            float space = textPaint.getLetterSpacing() * textPaint.getTextSize();
+            float wi = (measureHeight * textLength) + (space * (textLength - 1));
+            float px = x + wi / 2f;
+            float py = y - max / 2;
+            int count = canvas.save();
+            canvas.rotate(-90, px, py);
+            for (int i = 0; i < textLength; i++) {
+                char c = text.charAt(i);
+                float xi = px - measures[i] / 2f;
+                float yi = py - wi / 2f + measureHeight * (i + 1);
+                if (i > 0) {
+                    yi += i * space;
+                }
+                drawText(canvas, String.valueOf(c), 0, 1, xi, yi - descent, measureHeight, style, characterStyles);
+//                    canvas.drawText(String.valueOf(c), px - measures[i] / 2f, py + (i + 1 - (textLength / 2f)) * measureHeight, paint);
+            }
+            canvas.restoreToCount(count);
+            width = wi;
+        }
+        return width;
+    }
+
+    /**
      * 绘制文字阴影、边框、主体
      */
-    private void drawText(Canvas canvas, CharSequence text, int start, int end, float x, float y, float textWidth, Style style, ForegroundColorSpan foregroundColorSpan) {
+    private void drawText(Canvas canvas, CharSequence text, int start, int end, float x, float y, float textWidth, Style style, CharacterStyle[] characterStyles) {
         int drawCount = 0;
         int borderStyle = style == null ? 1 : style.getBorderStyle();
         boolean isBe = style != null && style.getBe() > 0;
@@ -543,6 +585,7 @@ public class StyledPaint {
         if (style != null && style.currentBlur > 0 && textPaint.getStrokeWidth() == 0) {
             textPaint.setMaskFilter(new BlurMaskFilter(pt2Px(style.currentBlur), BlurMaskFilter.Blur.NORMAL));
         }
+        ForegroundColorSpan foregroundColorSpan = applySpan(characterStyles);
         if (foregroundColorSpan != null) {
             if (foregroundColorSpan instanceof PartForegroundColorSpan) {
                 PartForegroundColorSpan partForegroundColorSpan = (PartForegroundColorSpan) foregroundColorSpan;
@@ -566,6 +609,32 @@ public class StyledPaint {
             canvas.drawText(text, start, end, x, y, textPaint);
         }
         textPaint.setMaskFilter(null);
+    }
+
+    private ForegroundColorSpan applySpan(CharacterStyle[] characterStyles) {
+        if (characterStyles == null || characterStyles.length == 0) {
+            return null;
+        }
+        ForegroundColorSpan foregroundColorSpan = null;
+        for (CharacterStyle span : characterStyles) {
+            if (span instanceof StrikethroughSpan) {
+                textPaint.setStrikeThruText(true);
+            } else if (span instanceof UnderlineSpan) {
+                textPaint.setUnderlineText(true);
+            } else if (span instanceof StyleSpan) {
+                StyleSpan styleSpan = (StyleSpan) span;
+                int style = styleSpan.getStyle();
+                if ((style & Typeface.BOLD) != 0) {
+                    textPaint.setFakeBoldText(true);
+                }
+                if ((style & Typeface.ITALIC) != 0) {
+                    textPaint.setTextSkewX(-0.25f);
+                }
+            } else if (span instanceof ForegroundColorSpan) {
+                foregroundColorSpan = (ForegroundColorSpan) span;
+            }
+        }
+        return foregroundColorSpan;
     }
 
     private Typeface typeface;
