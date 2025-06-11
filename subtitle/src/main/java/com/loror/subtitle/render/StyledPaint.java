@@ -51,6 +51,10 @@ public class StyledPaint {
     private int ptWidth;
     private int ptHeight;
     private boolean eachFallMode;//单字旋转
+    private boolean useCoverMode = true;
+
+    private final PorterDuffXfermode clearMode = new PorterDuffXfermode(PorterDuff.Mode.CLEAR);
+    private final PorterDuffXfermode coverMode = new PorterDuffXfermode(PorterDuff.Mode.SRC);
 
     public StyledPaint() {
         textPaint.setAntiAlias(true);
@@ -392,8 +396,6 @@ public class StyledPaint {
         }
     }
 
-    private final PorterDuffXfermode clearMode = new PorterDuffXfermode(PorterDuff.Mode.SRC_OUT);
-
     /**
      * 绘制text，支持StyledSpan、ForegroundColorSpan
      * 返回本次绘制高度
@@ -517,6 +519,7 @@ public class StyledPaint {
         if (borderStyle != 3) {
             this.setMode(StyledPaint.MODE_SHADOW);
             float shadowDeep = this.setPaint(style);
+            applySpan(characterStyles);
             float be = 0;
             if (isBe) {
                 be = style.getBe();
@@ -548,6 +551,7 @@ public class StyledPaint {
             if (strokeWidth > 0) {
                 this.setMode(StyledPaint.MODE_BORD);
                 this.setPaint(style);
+                applySpan(characterStyles);
                 int alpha = Color.alpha(textPaint.getColor());
                 if (alpha > 5) {
                     if (drawCount > 0) {
@@ -573,19 +577,24 @@ public class StyledPaint {
         }
         this.setMode(StyledPaint.MODE_BODY);
         this.setPaint(style);
+        ForegroundColorSpan foregroundColorSpan = applySpan(characterStyles);
         textPaint.setMaskFilter(null);
         if (saveLayer) {
-            textPaint.setXfermode(clearMode);
-            canvas.drawText(text, start, end, x, y, textPaint);
-            textPaint.setXfermode(null);
-            canvas.restoreToCount(layer);
+            if (useCoverMode) {
+                textPaint.setXfermode(coverMode);
+            } else {
+                textPaint.setXfermode(clearMode);
+                canvas.drawText(text, start, end, x, y, textPaint);
+                textPaint.setXfermode(null);
+                canvas.restoreToCount(layer);
+                saveLayer = false;
+            }
         }
         //注意\be标签只会模糊文本的边框 ，不是整体。
         //注意\blur如果没有边框，那么文本整体就会被模糊。
         if (style != null && style.currentBlur > 0 && textPaint.getStrokeWidth() == 0) {
             textPaint.setMaskFilter(new BlurMaskFilter(pt2Px(style.currentBlur), BlurMaskFilter.Blur.NORMAL));
         }
-        ForegroundColorSpan foregroundColorSpan = applySpan(characterStyles);
         if (foregroundColorSpan != null) {
             if (foregroundColorSpan instanceof PartForegroundColorSpan) {
                 PartForegroundColorSpan partForegroundColorSpan = (PartForegroundColorSpan) foregroundColorSpan;
@@ -607,6 +616,12 @@ public class StyledPaint {
             }
         } else {
             canvas.drawText(text, start, end, x, y, textPaint);
+        }
+        if (saveLayer) {
+            if (useCoverMode) {
+                textPaint.setXfermode(null);
+                canvas.restoreToCount(layer);
+            }
         }
         textPaint.setMaskFilter(null);
     }

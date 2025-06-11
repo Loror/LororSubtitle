@@ -7,6 +7,8 @@ import java.util.List;
 
 public class SubtitlesUtil {
 
+    public static final int SEARCH_MAX = 50;
+
     /**
      * 查找满足当前时间的所有字幕
      */
@@ -20,10 +22,13 @@ public class SubtitlesUtil {
             index = list.indexOf(target);
         }
         List<SubtitlesModel> result = new ArrayList<>();
-        for (int i = Math.max(0, index - 10); i < Math.min(index + 10, list.size()); i++) {
-            SubtitlesModel item = list.get(i);
-            if (time >= item.star && time <= item.end) {
-                result.add(item);
+        if (index >= 0) {
+            //model根据start排序，不能保证与time完全顺序，无法判定搜索结束，限制最大搜索范围
+            for (int i = Math.max(0, index - SEARCH_MAX); i < Math.min(index + SEARCH_MAX, list.size()); i++) {
+                SubtitlesModel item = list.get(i);
+                if (time >= item.star && time <= item.end) {
+                    result.add(item);
+                }
             }
         }
         if (result.isEmpty()) {

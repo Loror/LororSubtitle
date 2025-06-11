@@ -163,6 +163,7 @@ public class SubtitlesModel {
         private Float positionX;//相对屏幕坐标
         private Float positionY;//相对屏幕坐标
         private Rect clip;//裁剪
+        private Rect iClip;//裁剪
         private Float blur;//高斯模糊
         private Integer be;//边框高斯模糊
         private Float marginL;//左边距
@@ -746,8 +747,8 @@ public class SubtitlesModel {
                 String[] location = position.substring(1).split(",");
                 if (location.length == 2) {
                     try {
-                        positionX = Float.parseFloat(location[0]);
-                        positionY = Float.parseFloat(location[1]);
+                        positionX = Float.parseFloat(location[0].trim());
+                        positionY = Float.parseFloat(location[1].trim());
                     } catch (Exception e) {
                         System.err.println("error parse position:" + position);
                     }
@@ -759,21 +760,22 @@ public class SubtitlesModel {
 
         public void setMove(String move) {
             try {
+                //遇到move携带空格，暂单独位置标签trim
                 String[] location = move.substring(1).split(",");
                 if (location.length >= 4) {
                     try {
                         SubtitlesAnimation.MoveAnimation animation = new SubtitlesAnimation.MoveAnimation();
-                        animation.fromX = Float.parseFloat(location[0]);
-                        animation.fromY = Float.parseFloat(location[1]);
-                        animation.toX = Float.parseFloat(location[2]);
-                        animation.toY = Float.parseFloat(location[3]);
+                        animation.fromX = Float.parseFloat(location[0].trim());
+                        animation.fromY = Float.parseFloat(location[1].trim());
+                        animation.toX = Float.parseFloat(location[2].trim());
+                        animation.toY = Float.parseFloat(location[3].trim());
                         if (location.length > 4) {
-                            animation.durationStart = Integer.parseInt(location[4]);
+                            animation.durationStart = Integer.parseInt(location[4].trim());
                         } else {
                             animation.durationStart = -1;
                         }
                         if (location.length > 5) {
-                            animation.durationEnd = Integer.parseInt(location[5]);
+                            animation.durationEnd = Integer.parseInt(location[5].trim());
                         } else {
                             animation.durationEnd = -1;
                         }
@@ -783,8 +785,8 @@ public class SubtitlesModel {
                     }
                 } else if (location.length >= 2) {
                     try {
-                        positionX = Float.parseFloat(location[0]);
-                        positionY = Float.parseFloat(location[1]);
+                        positionX = Float.parseFloat(location[0].trim());
+                        positionY = Float.parseFloat(location[1].trim());
                     } catch (Exception e) {
                         System.err.println("error parse move:" + move);
                     }
@@ -827,6 +829,25 @@ public class SubtitlesModel {
                         this.clip = new Rect(Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2));
                     } catch (Exception e) {
                         System.err.println("error parse clip:" + clip);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("error parse clip:" + clip);
+            }
+        }
+
+        public void setIClip(String clip) {
+            try {
+                String[] location = clip.substring(1).split(",");
+                if (location.length == 4) {
+                    try {
+                        float x1 = Float.parseFloat(location[0]);
+                        float y1 = Float.parseFloat(location[1]);
+                        float x2 = Float.parseFloat(location[2]);
+                        float y2 = Float.parseFloat(location[3]);
+                        this.iClip = new Rect(Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2));
+                    } catch (Exception e) {
+                        System.err.println("error parse iclip:" + clip);
                     }
                 }
             } catch (Exception e) {
@@ -1001,8 +1022,8 @@ public class SubtitlesModel {
                 if (fade.charAt(0) == '(') {
                     String[] duration = fade.substring(1).split(",");
                     SubtitlesAnimation.FadeAnimation animation = new SubtitlesAnimation.FadeAnimation();
-                    animation.durationStart = (int) Float.parseFloat(duration[0]);
-                    animation.durationEnd = (int) Float.parseFloat(duration[1]);
+                    animation.durationStart = (int) Float.parseFloat(duration[0].trim());
+                    animation.durationEnd = (int) Float.parseFloat(duration[1].trim());
                     addAnimation(animation);
                 }
             } catch (Exception e) {
@@ -1016,16 +1037,16 @@ public class SubtitlesModel {
                     String[] fads = fade.substring(1).split(",");
                     if (fads.length == 7) {
                         SubtitlesAnimation.AlphaFadeAnimation animation = new SubtitlesAnimation.AlphaFadeAnimation();
-                        animation.fromAlpha = (int) Float.parseFloat(fads[0]);
-                        animation.toAlpha = (int) Float.parseFloat(fads[1]);
-                        animation.durationStart = (int) Float.parseFloat(fads[3]);
-                        animation.durationEnd = (int) Float.parseFloat(fads[4]);
+                        animation.fromAlpha = (int) Float.parseFloat(fads[0].trim());
+                        animation.toAlpha = (int) Float.parseFloat(fads[1].trim());
+                        animation.durationStart = (int) Float.parseFloat(fads[3].trim());
+                        animation.durationEnd = (int) Float.parseFloat(fads[4].trim());
                         addAnimation(animation);
                         animation = new SubtitlesAnimation.AlphaFadeAnimation();
-                        animation.fromAlpha = (int) Float.parseFloat(fads[2]);
-                        animation.toAlpha = (int) Float.parseFloat(fads[3]);
-                        animation.durationStart = (int) Float.parseFloat(fads[5]);
-                        animation.durationEnd = (int) Float.parseFloat(fads[6]);
+                        animation.fromAlpha = (int) Float.parseFloat(fads[2].trim());
+                        animation.toAlpha = (int) Float.parseFloat(fads[3].trim());
+                        animation.durationStart = (int) Float.parseFloat(fads[5].trim());
+                        animation.durationEnd = (int) Float.parseFloat(fads[6].trim());
                         addAnimation(animation);
                     }
                 }

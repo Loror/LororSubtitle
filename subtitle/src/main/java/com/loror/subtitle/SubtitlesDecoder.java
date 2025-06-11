@@ -1402,6 +1402,10 @@ public class SubtitlesDecoder {
             if (clip != null) {
                 result.setClip(clip);
             }
+            String iClip = find(mark, "\\iclip", ')');
+            if (iClip != null) {
+                result.setIClip(iClip);
+            }
             String s = find(mark, "\\s", '\\');
             if (s != null) {
                 result.setStrikeout(s);
