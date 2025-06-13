@@ -43,7 +43,7 @@ public class TextRender {
     private float srtBottomSpace = 60;//设置默认入幕srt底部距离
     private int width, height;//绘制宽高
     private float fontScale = 1f;
-    private boolean drawPath;//绘制path
+    private boolean drawPath = true;//绘制path
 
     public TextRender(int lineSpace) {
         this.lineSpace = lineSpace;
@@ -81,6 +81,7 @@ public class TextRender {
             showModels.putAll(models);
         }
         styledPaint.setPtSize(render.playResX, render.playResY);
+        vectorPaint.setPtSize(render.playResX, render.playResY);
     }
 
     /**
@@ -99,6 +100,7 @@ public class TextRender {
         }
         Rect area = getDrawArea(null);
         styledPaint.setScreenSize(area.width(), area.height());
+        vectorPaint.setScreenSize(area.width(), area.height());
         drawText(canvas);
     }
 
@@ -514,6 +516,13 @@ public class TextRender {
             float xd = (float) Math.cos(Math.toRadians(extra.currentDegreeY));
             float yd = (float) Math.cos(Math.toRadians(extra.currentDegreeX));
             canvas.scale(xd, yd, x, y);
+        }
+        if (extra.getFaX() != 0 || extra.getFaY() != 0) {
+            if (count == -1) {
+                count = canvas.save();
+            }
+            canvas.translate(-x * extra.getFaX(), -y * extra.getFaY());
+            canvas.skew(extra.getFaX(), extra.getFaY());
         }
         return count;
     }

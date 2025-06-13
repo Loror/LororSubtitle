@@ -715,9 +715,9 @@ public class SubtitlesDecoder {
         boolean create = false;
         Style base = null;
         Style top = null;
-        //一段文字存在不同字体样式，只保留第一段样式，颜色各自保留
+        //一段文字存在不同字体样式，第一段样式放置到SubtitlesModel中，其他样式放置到span
         for (String text : contents) {
-            if (text.startsWith("{\\")) {
+            if (text.startsWith("{")) {
                 int index = text.lastIndexOf("}");
                 if (index == -1 && text.charAt(text.length() - 1) == '\\') {
                     index = text.length() - 1;
@@ -770,17 +770,6 @@ public class SubtitlesDecoder {
                         } else {
                             style.extendStyle(mine);
                         }
-//                        if (!TextUtils.isEmpty(color)) {
-//                            if (style == null) {
-//                                style = new Style();
-//                            }
-//                            try {
-//                                style.setFontColor(SubColorUtil.parseArgb(color));
-//                            } catch (Exception e) {
-//                                e.printStackTrace();
-//                                System.err.println("SubtitlesView parse c failed:" + color);
-//                            }
-//                        }
                         if (style == null) {
                             result.append(data);
                         } else {
@@ -799,7 +788,6 @@ public class SubtitlesDecoder {
                 }
             }
             CharSequence data = filterString(text);
-//            String color = findColor(data.toString());
             if (findHtml(data.toString())) {
                 data = Html.fromHtml(data.toString().replace("\n", "<br/>")
                         .replace(" ", "&nbsp;"));
@@ -870,26 +858,6 @@ public class SubtitlesDecoder {
     private static List<String> splitContent(CharSequence content) {
         String texts = content.toString().replace("\\\\N", "\\n");
         List<String> contents = new ArrayList<>();
-//        int i = 0;
-//        //{\开头时候，第一个为空
-//        for (String s : texts.split("\\{\\\\")) {
-//            if (!TextUtils.isEmpty(s)) {
-//                if (i == 0) {
-//                    if (s.startsWith("{\\")) {
-//                        contents.add("{\\" + s);
-//                    } else {
-//                        contents.add(s);
-//                    }
-//                } else {
-//                    contents.add("{\\" + s);
-//                }
-//            }
-//            i++;
-//        }
-//        if (i == 1) {
-//            contents.clear();
-//            contents.add(texts);
-//        }
         //{=4}{\an1}字幕{\an2}{=5}字幕1{\an3}字幕2 出现非标签{}
         StringBuilder text = new StringBuilder();
         boolean hasEnd = false;
@@ -1257,30 +1225,7 @@ public class SubtitlesDecoder {
             String t = find(mark, "\\t", ')');
             if (t != null && !t.isEmpty()) {
                 result.setT(t);
-                String clip = find(mark, "\\clip", ')');
-                if (clip != null) {
-                    result.addClipAnimation(clip);
-                }
-                String fs = find(mark, "\\fs", ')');
-                if (fs != null) {
-                    result.addFontSizeAnimation(fs);
-                }
-                String blur = find(mark, "\\blur", ')');
-                if (blur != null) {
-                    result.addBlurAnimation(blur);
-                }
-                String frz = find(mark, "\\frz", ')');
-                if (frz != null) {
-                    result.addDegreeAnimation("z", frz);
-                }
-                String frx = find(mark, "\\frx", ')');
-                if (frx != null) {
-                    result.addDegreeAnimation("x", frx);
-                }
-                String fry = find(mark, "\\fry", ')');
-                if (fry != null) {
-                    result.addDegreeAnimation("y", fry);
-                }
+                parseTAnimation(result, mark);
                 return;
             }
             String pos = find(mark, "\\pos", ')');
@@ -1379,6 +1324,16 @@ public class SubtitlesDecoder {
                 result.setDegreeY(fry);
                 return;
             }
+            String fax = find(mark, "\\fax", '\\');
+            if (fax != null) {
+                result.setFaX(fax);
+                return;
+            }
+            String fay = find(mark, "\\fay", '\\');
+            if (fay != null) {
+                result.setFaY(fay);
+                return;
+            }
             String p = find(mark, "\\p", '\\');
             if (p != null) {
                 if (TextUtil.isNumber(p)) {
@@ -1410,6 +1365,42 @@ public class SubtitlesDecoder {
             if (s != null) {
                 result.setStrikeout(s);
                 return;
+            }
+        }
+
+        private static void parseTAnimation(Style result, String mark) {
+            String clip = find(mark, "\\clip", ')');
+            if (clip != null) {
+                result.addClipAnimation(clip);
+                return;
+            }
+            String fs = find(mark, "\\fs", ')');
+            if (fs != null) {
+                result.addFontSizeAnimation(fs);
+            }
+            String blur = find(mark, "\\blur", ')');
+            if (blur != null) {
+                result.addBlurAnimation(blur);
+            }
+            String frz = find(mark, "\\frz", ')');
+            if (frz != null) {
+                result.addDegreeAnimation("z", frz);
+            }
+            String frx = find(mark, "\\frx", ')');
+            if (frx != null) {
+                result.addDegreeAnimation("x", frx);
+            }
+            String fry = find(mark, "\\fry", ')');
+            if (fry != null) {
+                result.addDegreeAnimation("y", fry);
+            }
+            String fscx = find(mark, "\\fscx", ')');
+            if (fscx != null) {
+                result.addFsScaleAnimation("x", fscx);
+            }
+            String fscy = find(mark, "\\fscy", ')');
+            if (fscy != null) {
+                result.addFsScaleAnimation("y", fscy);
             }
         }
 
@@ -1470,6 +1461,9 @@ public class SubtitlesDecoder {
                     }
                 }
                 if (cmd != '0' && !points.isEmpty()) {
+                    if (number.length() > 0) {
+                        points.add(Float.parseFloat(number.toString()));
+                    }
                     addPoint(paths, cmd, points);
                 }
                 return paths;
@@ -1482,18 +1476,22 @@ public class SubtitlesDecoder {
                 return;
             }
             switch (cmd) {
-                case 'l':
                 case 'p': {
                     for (int i = 0; i < points.size(); i++) {
                         SubtitlesModel.Point point = new SubtitlesModel.Point();
                         point.x = points.get(i);
                         point.y = points.get(i + 1);
                         i++;
-                        SubtitlesModel.Path path = new SubtitlesModel.Path();
-                        path.cmd = cmd;
-                        path.points = new ArrayList<>();
-                        path.points.add(point);
-                        paths.add(path);
+                        SubtitlesModel.Path last = paths.isEmpty() ? null : paths.get(paths.size() - 1);
+                        if (last != null && last.cmd == 's') {
+                            last.points.add(point);
+                        } else {
+                            SubtitlesModel.Path path = new SubtitlesModel.Path();
+                            path.cmd = cmd;
+                            path.points = new ArrayList<>();
+                            path.points.add(point);
+                            paths.add(path);
+                        }
                     }
                 }
                 break;
@@ -1515,6 +1513,7 @@ public class SubtitlesDecoder {
                     }
                 }
                 break;
+                case 'l':
                 default: {
                     SubtitlesModel.Path path = new SubtitlesModel.Path();
                     path.cmd = cmd;

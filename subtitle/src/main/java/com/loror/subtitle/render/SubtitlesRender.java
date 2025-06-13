@@ -215,6 +215,8 @@ public class SubtitlesRender {
         float lastDegree = extra.currentDegree;
         float lastDegreeX = extra.currentDegreeX;
         float lastDegreeY = extra.currentDegreeY;
+        float lastScaleX = extra.currentScaleX;
+        float lastScaleY = extra.currentScaleY;
         float lastBlur = extra.currentBlur;
         long go = Math.max(time - sub.star, 0);
         while (animation != null) {
@@ -334,6 +336,25 @@ public class SubtitlesRender {
                     extra.currentBlur = blurAnimation.blur;
                 }
                 lastBlur = extra.currentBlur;
+            } else if (animation instanceof SubtitlesAnimation.FsScaleAnimation) {
+                SubtitlesAnimation.FsScaleAnimation scaleAnimation = (SubtitlesAnimation.FsScaleAnimation) animation;
+                if (Objects.equals("x", scaleAnimation.type)) {
+                    if (go > scaleAnimation.durationStart && go < scaleAnimation.durationEnd) {
+                        float bl = Math.min((go - scaleAnimation.durationStart) * 1f / (scaleAnimation.durationEnd - scaleAnimation.durationStart), 1);
+                        extra.currentScaleX = (lastScaleX + (scaleAnimation.scale - lastScaleX) * Math.min(bl, 1));
+                    } else if (go > scaleAnimation.durationEnd) {
+                        extra.currentScaleX = scaleAnimation.scale;
+                    }
+                    lastScaleX = extra.currentScaleX;
+                } else if (Objects.equals("y", scaleAnimation.type)) {
+                    if (go > scaleAnimation.durationStart && go < scaleAnimation.durationEnd) {
+                        float bl = Math.min((go - scaleAnimation.durationStart) * 1f / (scaleAnimation.durationEnd - scaleAnimation.durationStart), 1);
+                        extra.currentScaleY = (lastScaleY + (scaleAnimation.scale - lastScaleY) * Math.min(bl, 1));
+                    } else if (go > scaleAnimation.durationEnd) {
+                        extra.currentScaleY = scaleAnimation.scale;
+                    }
+                    lastScaleY = extra.currentScaleY;
+                }
             }
 
             animation = animation.next;
@@ -363,10 +384,13 @@ public class SubtitlesRender {
                 }
             }
         }
-        float min = Math.min(extra.currentScaleX, extra.currentScaleY);
-        extra.currentScaleX = extra.currentScaleX / min;
-        extra.currentScaleY = extra.currentScaleY / min;
-        extra.currentFontScale = extra.currentFontScale * min;
+        //文字字幕只缩放x轴，字高缩放通过xy轴设置标准
+        if (!extra.isPath) {
+            float min = Math.min(extra.currentScaleX, extra.currentScaleY);
+            extra.currentScaleX = extra.currentScaleX / min;
+            extra.currentScaleY = extra.currentScaleY / min;
+            extra.currentFontScale = extra.currentFontScale * min;
+        }
     }
 
     public boolean isHasMove() {

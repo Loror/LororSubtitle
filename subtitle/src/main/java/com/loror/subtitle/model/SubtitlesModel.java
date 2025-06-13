@@ -160,6 +160,8 @@ public class SubtitlesModel {
         private Float degree;//旋转角度（逆时针）
         private Float degreeX;//旋转角度（x轴）
         private Float degreeY;//旋转角度（y轴）
+        private Float faX;//斜切（x轴）
+        private Float faY;//斜切（y轴）
         private Float positionX;//相对屏幕坐标
         private Float positionY;//相对屏幕坐标
         private Rect clip;//裁剪
@@ -210,6 +212,8 @@ public class SubtitlesModel {
             this.degree = style.degree;
             this.degreeX = style.degreeX;
             this.degreeY = style.degreeY;
+            this.faX = style.faX;
+            this.faY = style.faY;
             this.positionX = style.positionX;
             this.positionY = style.positionY;
             this.clip = style.clip;
@@ -352,6 +356,12 @@ public class SubtitlesModel {
             }
             if (value.degreeY != null) {
                 this.degreeY = value.degreeY;
+            }
+            if (value.faX != null) {
+                this.faX = value.faX;
+            }
+            if (value.faY != null) {
+                this.faY = value.faY;
             }
             if (value.animation != null) {
                 this.animation = value.animation;
@@ -726,6 +736,30 @@ public class SubtitlesModel {
             }
         }
 
+        public float getFaX() {
+            return faX == null ? 0 : faX;
+        }
+
+        public void setFaX(String degree) {
+            try {
+                this.faX = Float.parseFloat(degree);
+            } catch (Exception e) {
+                System.err.println("error parse fay x:" + degree);
+            }
+        }
+
+        public float getFaY() {
+            return faY == null ? 0 : faY;
+        }
+
+        public void setFaY(String degree) {
+            try {
+                this.faY = Float.parseFloat(degree);
+            } catch (Exception e) {
+                System.err.println("error parse fay y:" + degree);
+            }
+        }
+
         public boolean hasPositionX() {
             return positionX != null;
         }
@@ -993,6 +1027,20 @@ public class SubtitlesModel {
             }
         }
 
+        public void addFsScaleAnimation(String type, String d) {
+            try {
+                float fs = Float.parseFloat(d);
+                SubtitlesAnimation.FsScaleAnimation animation = new SubtitlesAnimation.FsScaleAnimation();
+                animation.type = type;
+                animation.scale = fs / 100;
+                animation.durationStart = durationT1;
+                animation.durationEnd = durationT2;
+                addAnimation(animation);
+            } catch (Exception e) {
+                System.err.println("error parse degree anima:" + d);
+            }
+        }
+
         public void addBlurAnimation(String b) {
             try {
                 float blur = Float.parseFloat(b);
@@ -1120,6 +1168,8 @@ public class SubtitlesModel {
                     ", degree=" + degree +
                     ", degreeX=" + degreeX +
                     ", degreeY=" + degreeY +
+                    ", faX=" + faX +
+                    ", faY=" + faY +
                     ", scaleX=" + scaleX +
                     ", scaleY=" + scaleY +
                     ", playResX=" + playResX +

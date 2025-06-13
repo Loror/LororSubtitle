@@ -14,7 +14,7 @@ public class SubtitlesAnimation {
             nextClass = "";
             SubtitlesAnimation item = this;
             while (item.next != null) {
-                nextClass += item.next.getClass().getSimpleName() + ",";
+                nextClass += item.next + ",";
                 item = item.next;
             }
         }
@@ -125,6 +125,22 @@ public class SubtitlesAnimation {
         public String toString() {
             return "BlurAnimation{" +
                     "blur=" + blur +
+                    ", durationStart=" + durationStart +
+                    ", durationEnd=" + durationEnd +
+                    ", next=" + nextAnimationType() +
+                    '}';
+        }
+    }
+
+    public static class FsScaleAnimation extends SubtitlesAnimation {
+
+        public String type;//x,y,z
+        public float scale;
+
+        @Override
+        public String toString() {
+            return "FsScaleAnimation{" +
+                    "scale=" + scale +
                     ", durationStart=" + durationStart +
                     ", durationEnd=" + durationEnd +
                     ", next=" + nextAnimationType() +
